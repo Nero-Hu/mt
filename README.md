@@ -1,2 +1,2 @@
-# mt
-Machine Translation Repo
+# MT
+Machine Translation Reporsitory
