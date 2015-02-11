@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import optparse
 import sys
+import numpy
 from collections import defaultdict
 
 #Shameless copy 
@@ -42,39 +43,48 @@ for (n,e) in enumerate(e_list):
 
 #Construct array as e_count x f_count
 #Probability P(e|f)
-pef = [[float(0) for x in range(f_count)] for x in range(e_count)]
+pef = numpy.zeros((e_count,f_count))
+#record new pef to compare with old one
+npef = numpy.zeros((e_count,f_count))
 #Initialize parameters with uniform distribution
-for (n,e) in enumerate(pef):
-	for f in range(len(e)):
-		pef[n][f] = float(1)/float(f_count)
+npef.fill(float(1)/float(f_count))
+# for (n,e) in enumerate(pef):
+# 	for f in range(len(e)):
+# 		pef[n][f] = float(1)/float(f_count)
 
 #TODO, check converge, considering check the change rate to be smaller than 0.01 for every word
-for it in xrange(1,100):
-	# Initialize 
-	#Count for C(e|f)
-	cef = [[float(0) for x in range(f_count)] for x in range(e_count)]
-	totalf = [float(0)] * (f_count)
-	totale = [float(0)] * (e_count)
+# convergeThreshold = 0.01
+# while sum(sum(numpy.absolute(pef-npef))) > convergeThreshold:
+for it in range(30):
+	pef = npef
+	# Initialize Count for C(e|f)
+	cef = numpy.zeros((e_count,f_count))
+	totalf = numpy.zeros(f_count)
+	totalf.fill(numpy.inf)
 	for f,e in bitext:
 		#Compute normalization
 		for e_word in set(e):
-			totale[e_index[e_word]] = float(0)
+			totale = float(0)
 			for f_word in set(f):
-				totale[e_index[e_word]] += pef[e_index[e_word]][f_index[f_word]]
-		#Collect counts
-		for e_word in set(e):
+				totale += pef[e_index[e_word]][f_index[f_word]]
 			for f_word in set(f):
-				cef[e_index[e_word]][f_index[f_word]] += float(pef[e_index[e_word]][f_index[f_word]]) / float(totale[e_index[e_word]])
-				totalf[f_index[f_word]] += float(pef[e_index[e_word]][f_index[f_word]]) / float(totale[e_index[e_word]])
+				cef[e_index[e_word]][f_index[f_word]] += float(pef[e_index[e_word]][f_index[f_word]]) / float(totale)
+				if totalf[f_index[f_word]] == numpy.inf:
+					totalf[f_index[f_word]] = float(0)
+				totalf[f_index[f_word]] += float(pef[e_index[e_word]][f_index[f_word]]) / float(totale)
 	#Estimate probabilities
-	for f_word in f_list:
-		for e_word in e_list:
-			#Prevent for case 0
-			if totalf[f_index[f_word]] == 0:
-				pef[e_index[e_word]][f_index[f_word]] = float(0)
-			else:	
-				pef[e_index[e_word]][f_index[f_word]] = float(cef[e_index[e_word]][f_index[f_word]])/float(totalf[f_index[f_word]])
+	npef = (cef.T / totalf[:,None]).T
+	# print it,tef
+	# for f_word in f_list:
+	# 	for e_word in e_list:
+	# 		#Prevent for case 0
+	# 		if totalf[f_index[f_word]] == 0:
+	# 			pef[e_index[e_word]][f_index[f_word]] = float(0)
+	# 		else:	
+	# 			pef[e_index[e_word]][f_index[f_word]] = float(cef[e_index[e_word]][f_index[f_word]])/float(totalf[f_index[f_word]])
+	# print pef
 
+pef = npef
 # Output word transfer
 for (f, e) in bitext:
 	for (i, f_word) in enumerate(f):
