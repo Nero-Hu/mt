@@ -45,38 +45,6 @@ def main(argv):
 	tef = trainFastAlign(bitext, f_index, e_index, f_count, e_count, max_iter=5)
 	output(bitext, tef, f_index, e_index)
 
-#Train t(e|f) using ibm model 1 for 5 times, to gain better t(e|f)
-def trainModel1(bitext, f_index, e_index, f_count, e_count, max_iter = 20, convergeThreshold=1e-2):
-	#Construct array as e_count x f_count
-	#Probability P(e|f)
-	tef = numpy.zeros((e_count,f_count))
-	#record new pef to compare with old one
-	ntef = numpy.zeros((e_count,f_count))
-	#Initialize parameters with uniform distribution
-	ntef.fill(float(1)/float(e_count))
-
-	it = 0
-	while it < max_iter and sum(sum(numpy.absolute(tef-ntef))) > convergeThreshold:
-		it += 1
-		tef = ntef
-		# Initialize Count for C(e|f)
-		cef = numpy.zeros((e_count,f_count))
-		totalf = numpy.zeros(f_count)
-		for e,f in bitext:
-			fn = [None] + f
-			#Compute normalization
-			for e_word in e:
-				totale = float(0)
-				for f_word in fn:
-					totale += tef[e_index[e_word]][f_index[f_word]]
-				for f_word in fn:
-					cef[e_index[e_word]][f_index[f_word]] += float(tef[e_index[e_word]][f_index[f_word]]) / float(totale)
-					totalf[f_index[f_word]] += float(tef[e_index[e_word]][f_index[f_word]]) / float(totale)
-		#Estimate probabilities
-		ntef = (cef.T / totalf[:,None]).T
-
-	return ntef
-
 #Take optimized t(e|f), train using IBM Model 2
 def trainFastAlign(bitext, f_index, e_index, f_count, e_count, max_iter = 50, convergeThreshold = 1e-2):
 	global p0, lamb
@@ -125,7 +93,7 @@ def trainFastAlign(bitext, f_index, e_index, f_count, e_count, max_iter = 50, co
 		#Estimate probabilities
 		tef += cef
 		totale = numpy.sum(tef, axis = 1)
-		# print totale
+
 		for row in range(tef.shape[0]):
 			if totale[row] == 0.0:
 				totale[row] = 1.0
