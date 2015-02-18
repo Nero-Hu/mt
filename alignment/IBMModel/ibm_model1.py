@@ -48,19 +48,15 @@ pef = numpy.zeros((e_count,f_count))
 npef = numpy.zeros((e_count,f_count))
 #Initialize parameters with uniform distribution
 npef.fill(float(1)/float(f_count))
-# for (n,e) in enumerate(pef):
-# 	for f in range(len(e)):
-# 		pef[n][f] = float(1)/float(f_count)
 
-#TODO, check converge, considering check the change rate to be smaller than 0.01 for every word
-# convergeThreshold = 0.01
+#check converge, considering check the change rate to be smaller than 0.01 for every word
+convergeThreshold = 0.01
 # while sum(sum(numpy.absolute(pef-npef))) > convergeThreshold:
-for it in range(30):
+for it in range(5):
 	pef = npef
 	# Initialize Count for C(e|f)
 	cef = numpy.zeros((e_count,f_count))
 	totalf = numpy.zeros(f_count)
-	totalf.fill(numpy.inf)
 	for f,e in bitext:
 		#Compute normalization
 		for e_word in set(e):
@@ -69,32 +65,20 @@ for it in range(30):
 				totale += pef[e_index[e_word]][f_index[f_word]]
 			for f_word in set(f):
 				cef[e_index[e_word]][f_index[f_word]] += float(pef[e_index[e_word]][f_index[f_word]]) / float(totale)
-				if totalf[f_index[f_word]] == numpy.inf:
-					totalf[f_index[f_word]] = float(0)
 				totalf[f_index[f_word]] += float(pef[e_index[e_word]][f_index[f_word]]) / float(totale)
 	#Estimate probabilities
+	totalf[totalf == float(0)] = numpy.inf
 	npef = (cef.T / totalf[:,None]).T
-	# print it,tef
-	# for f_word in f_list:
-	# 	for e_word in e_list:
-	# 		#Prevent for case 0
-	# 		if totalf[f_index[f_word]] == 0:
-	# 			pef[e_index[e_word]][f_index[f_word]] = float(0)
-	# 		else:	
-	# 			pef[e_index[e_word]][f_index[f_word]] = float(cef[e_index[e_word]][f_index[f_word]])/float(totalf[f_index[f_word]])
-	# print pef
 
 pef = npef
 # Output word transfer
 for (f, e) in bitext:
 	for (i, f_word) in enumerate(f):
 		max_j = 0
-		max_word = ''
 		max_prob = float(0)
 		for (j, e_word) in enumerate(e):
 			if pef[e_index[e_word]][f_index[f_word]] > max_prob:
 				max_j = j
-				max_word = e_word
 				max_prob = pef[e_index[e_word]][f_index[f_word]]
 		sys.stdout.write("%i-%i " % (i,max_j))
 	sys.stdout.write("\n")
