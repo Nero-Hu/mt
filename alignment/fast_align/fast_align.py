@@ -253,26 +253,26 @@ def grow_diagonal(e2f, f2e):
 	for n in range(len(e2f)):
 		#Find intersection array and union array
 		A.append(e2f[n] & f2e[n].T)
-		# Below buggy
-		U = e2f[n] | f2e[n].T
+		# Not as good as direct intersection
+		# U = e2f[n] | f2e[n].T
 
-		oldA = numpy.zeros(A[n].shape, dtype=bool)
+		# oldA = numpy.zeros(A[n].shape, dtype=bool)
 
-		row = A[n].shape[0]
-		col = A[n].shape[1]
+		# row = A[n].shape[0]
+		# col = A[n].shape[1]
 
-		while numpy.array_equal(oldA,A[n]) == False:
-			#Add new aligns
-			oldA = A[n]
-			for e in range(row):
-				for f in range(col):
-					if A[n][e][f] == True:
-						for (i,j) in neighboring:
-							e_new = e + i
-							f_new = f + j
-							if 0 <= e_new < row and 0 <= f_new < col:
-								if (numpy.sum(A[n][e_new,:]) == 0 or numpy.sum(A[n][:,f_new]) == 0) and U[e_new][f_new] == True:
-									A[n][e_new][f_new] = True
+		# while numpy.array_equal(oldA,A[n]) == False:
+		# 	#Add new aligns
+		# 	oldA = A[n]
+		# 	for e in range(row):
+		# 		for f in range(col):
+		# 			if A[n][e][f] == True:
+		# 				for (i,j) in neighboring:
+		# 					e_new = e + i
+		# 					f_new = f + j
+		# 					if 0 <= e_new < row and 0 <= f_new < col:
+		# 						if (numpy.sum(A[n][e_new,:]) == 0 or numpy.sum(A[n][:,f_new]) == 0) and U[e_new][f_new] == True:
+		# 							A[n][e_new][f_new] = True
 
 def finalAnd(e2f_in, reverse = False):
 	for n in range(len(e2f_in)):
