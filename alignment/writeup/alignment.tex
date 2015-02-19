@@ -1,0 +1,210 @@
+\documentclass[11pt]{article}
+
+\usepackage{graphicx}
+\usepackage{wrapfig}
+\usepackage{url}
+\usepackage{wrapfig}
+\usepackage{color}
+\usepackage{marvosym}
+\usepackage{enumerate}
+\usepackage{subfigure}
+\usepackage{tikz}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{hyperref}
+\usepackage{CJKutf8}
+\usepackage{listings}
+\usepackage[encapsulated]{CJK}
+% set the default code style
+\lstset{
+    frame=tb, % draw a frame at the top and bottom of the code block
+    tabsize=2
+}
+
+\oddsidemargin 0mm
+\evensidemargin 5mm
+\topmargin -20mm
+\textheight 240mm
+\textwidth 160mm
+
+\newcommand{\vw}{{\bf w}}
+\newcommand{\vx}{{\bf x}}
+\newcommand{\vy}{{\bf y}}
+\newcommand{\vxi}{{\bf x}_i}
+\newcommand{\yi}{y_i}
+\newcommand{\vxj}{{\bf x}_j}
+\newcommand{\vxn}{{\bf x}_n}
+\newcommand{\yj}{y_j}
+\newcommand{\ai}{\alpha_i}
+\newcommand{\aj}{\alpha_j}
+\newcommand{\X}{{\bf X}}
+\newcommand{\Y}{{\bf Y}}
+\newcommand{\vz}{{\bf z}}
+\newcommand{\msigma}{{\bf \Sigma}}
+\newcommand{\vmu}{{\bf \mu}}
+\newcommand{\vmuk}{{\bf \mu}_k}
+\newcommand{\msigmak}{{\bf \Sigma}_k}
+\newcommand{\vmuj}{{\bf \mu}_j}
+\newcommand{\msigmaj}{{\bf \Sigma}_j}
+\newcommand{\pij}{\pi_j}
+\newcommand{\pik}{\pi_k}
+\newcommand{\D}{\mathcal{D}}
+\newcommand{\el}{\mathcal{L}}
+\newcommand{\N}{\mathcal{N}}
+\newcommand{\vxij}{{\bf x}_{ij}}
+\newcommand{\vt}{{\bf t}}
+\newcommand{\yh}{\hat{y}}
+\newcommand{\code}[1]{{\footnotesize \tt #1}}
+\newcommand{\alphai}{\alpha_i}
+
+\pagestyle{myheadings}
+\markboth{Haitang Hu}{Machine Translation : Homework 1}
+
+
+\title{Machine Translation\\Alignment}
+\author{Haitang Hu \\
+  {\tt hthu@cs.jhu.edu}}
+\date{\today}
+
+\begin{document}
+\large
+\maketitle
+\thispagestyle{headings}
+\noindent
+\textbf{The implementation is based on the work of Chris Dyer et al.\cite{fast}\\
+\url{}}
+
+\section{Derivation} % (fold)
+\label{sec:derivation}
+Instead of assuming all words are aligned equally, this model will favor on the diagonal word pairs. Also, the normalizing parameters can be computed in $O(1)$ time, which makes the computing process more efficient.
+% section derivation (end)
+
+\subsection{Marginals} % (fold)
+\label{sub:marginals}
+Denote the input sentence pair as \textbf{(f,e)}, and correspondingly their length to be \textit{(lf,le)}, and the alignment as $a$.\\
+For every word $e_i$ in \textbf{e}\footnote{This \textbf{e} does not have to be English, but can be referred to be the source language. Same thing goes to \textbf{f}, which can be interpreted as target language.}, the joint probability of $e_i$ aligned to a specific location $a_i$ to be some specific translation $f_{a_i}$ can be expressed as:
+$$ p(e_i, a_i \mid f, le, lf) = \delta(a_i \mid i, le, lf) t(e_i| f_{a_i})$$
+We could simply marginalize out $a_i$, by summing all its possible choices:
+$$ p(e_i \mid f, le, lf) = \sum_{j=0}^{lf} p(e_i, a_i =j \mid f, le, lf)$$
+The marginal is computed in the same way as IBM Model 2.\\
+$$ p(e \mid f) = \prod_{i=1}^{le}p(e_i \mid f, le, lf) $$
+$$ = \prod_{i=1}^{le} \sum_{j=0}^{lf} \delta(a_i \mid i, le, lf) t(e_i| f_{a_i})$$
+Since we favored the diagonal pairs, the $\delta(a_i = j \mid i, le, lf)$ can be computed as follow:
+$$ h(i,j,le,lf) = - |\frac{i}{le} - \frac{j}{lf}|$$
+\[ \delta(a_i = j \mid i, le, lf) = \left\{
+  \begin{array}{l l}
+    p_0 & \quad \text{if $j = 0$ (null word)}\\
+    (1-p_0) \frac{e^{\lambda h(i,j, le, lf)}}{Z_{\lambda}(i, le, lf)} & \quad 0 < j \leq lf
+  \end{array} \right.\]
+% subsection marginals (end)
+
+\subsection{Normalization Trick} % (fold)
+\label{sub:normalization_trick}
+According to the paper, the normalization constant is allowed to be computed in constant $O(1)$ time. Since the unnormalized probabilities can be extended up and down from the diagonal, so we could compute through its closest point.
+$$ j_{\uparrow} = \lfloor \frac{i \times lf }{le}\rfloor, j_{\downarrow} = j_{\uparrow} + 1 $$
+While move one step, the probability will change at the rate:
+$$ r = e^{\frac{-\lambda}{lf}}$$
+Here we introduce the geometric series: a series with a constant ratio between successive terms. In this problem, this ratio is $r$, and the value at states $n$ could be expressed as:
+$$ s_j(a,r) = a + ar + ar^2 + \dots + ar^{n-1} = a\frac{1-r^n}{1-r}$$
+Where $ a = e^{\lambda h(i,j,le,lf)}$
+Then, the normalize term $Z_{\lambda}(i, le, lf)$ could be computed as
+$$ s_{j_{\uparrow}}(a_{j_{\uparrow}}, r) + s_{n-j_{\downarrow}}(a_{j_{\downarrow}}, r)$$
+
+All computation mathematics is described above, where I didn't utilize automatic parameter optimization and gradient descent. Instead, other optimization efforts are described in later section.
+% subsection normalization_trick (end)
+
+\section{Implementation} % (fold)
+\label{sec:implementation}
+The pseudo code shows below:
+\begin{lstlisting}[language=Python, caption={fast\_align.py}]
+def main(args):
+	bitext = pair(f_data, e_data)
+	revtext = pair(e_data, f_data)
+	#Compute alignment in 2 direction
+	e2f = trainFastAlign(bitext, max_iter=5)
+	f2e = trainFastAlign(revtext, max_iter=5)
+	#Use intersection to output
+	intersection(e2f, f2e)
+	output()
+
+def trainFastAlign(bitext):
+	#Initialize translation probability using model 1
+	tef = trainModel1(bitext)
+	#Do 5 iterations
+	for it in range(max_iter):
+		cef = array((e_count,f_count))
+		likelihood = 0.0
+		#Enumerate lines
+		for (n, (e, f)) in enumerate(bitext):
+			# Add null word
+			en = [None] + e
+
+			#Compute normalization
+			prob_e(le)
+			for (j, f_word) in enumerate(f):
+
+				for (i, e_word) in enumerate(en):
+					if i == 0:
+						prob_a_i = p0
+					else:
+						prob_a_i = prob( j+1, i, lf, le -1, lamb) / Z
+
+					prob_e[i] = tef[e_word][f_word] * prob_a_i
+					sum_prob += prob_e[i]
+
+				#Collect counts
+				for (i, e_word) in enumerate(en):
+					c = prob_e[i] / sum_prob
+					cef[e_index[e_word]][f_index[f_word]] += c
+
+		#Estimate probabilities(Add counts)
+		tef += cef
+		#Normalize tef by row
+		normalize(tef)
+
+\end{lstlisting}
+% section implementation (end)
+\section{Optimization} % (fold)
+\label{sec:optimization}
+The optimization has be conducted on three aspects, initialization on word translation probability, parameters $p_0, \lambda$ and alignment Refinement\cite{sym}.
+\subsection{Initial Probability} % (fold)
+\label{sub:initial_probability}
+Generally there are two ways to initialize word translation probability. We could either assign a uniform possibility, or use a pre-processing stage, where the translation probability is produced by IBM model 1 with several iterations. After testing the \textbf{AER}, a pre-processing method will reduce \textbf{AER} comparing to an arbitrary uniform initialization.
+% subsection initial_probability (end)
+\subsection{Parameter optimization} % (fold)
+\label{sub:parameter_optimization}
+The parameters are evaluated on $1000$ lines of sentences, and take the parameter that minimize the \textbf{AER}. 
+\begin{table}
+\centering
+\begin{tabular}{ | c | c | c |}
+\hline
+ $p_0$ & $\lambda$ & AER \\
+\hline
+$0.01$ & $4.0$ & $31.48$ \\
+\hline
+$0.05$ & $4.0$ & $28.31$\\
+\hline
+$0.08$ & $2.0$ & $27.70$\\
+\hline
+$0.08$ & $4.0$ & $26.53$\\
+\hline
+$0.10$ & $4.0$ & $30.95$\\
+\hline
+\end{tabular}
+\caption{Parameter optimization}
+\end{table}
+% subsection parameter_optimization (end)
+\subsection{Alignment Refinement} % (fold)
+\label{sub:alignment_refinement}
+The input data will be trained twice, from source language to target language and vice versa. Then a simple intersection on the alignment is taken, which improves the \textbf{AER} by $3\%$. A grow diagonal is implemented, but seems buggy which increases the \textbf{AER}. So, by far the simple intersection is used.
+% subsection alignment_refinement (end)
+% section optimization (end)
+
+\begin{thebibliography}{50}
+\bibitem{fast} Chris Dyer, Victor Chahuneau, Noah A. Smith. \textsl{A Simple, Fast, and Effective Reparameterization of IBM Model 2}, 2013.
+
+\bibitem{sym} Och, Franz Josef and Ney, Hermann. \textsl{A Systematic Comparison of Various Statistical Alignment Models}, 2003.
+
+\bibitem{aam} Philipp Koehn. \textsl{Advanced Alignment Models}, 2015, \url{http://mt-class.org/jhu/slides/lecture-advanced-alignment-models.pdf}
+\end{thebibliography}
+\end{document}
