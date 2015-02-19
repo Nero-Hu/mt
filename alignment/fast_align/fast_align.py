@@ -19,8 +19,8 @@ def main(argv):
 	bitext = [[sentence.strip().split() for sentence in pair] for pair in zip(open(f_data), open(e_data))[:opts.num_sents]]
 	revtext = [[sentence.strip().split() for sentence in pair] for pair in zip(open(e_data), open(f_data))[:opts.num_sents]]
 
-	e2f = trainFastAlign(bitext, max_iter=8)
-	f2e = trainFastAlign(revtext, max_iter=8)
+	e2f = trainFastAlign(bitext, max_iter=5)
+	f2e = trainFastAlign(revtext, max_iter=5)
 
 	global A
 	A = []
@@ -254,25 +254,25 @@ def grow_diagonal(e2f, f2e):
 		#Find intersection array and union array
 		A.append(e2f[n] & f2e[n].T)
 		# Below buggy
-		# U = e2f[n] | f2e[n].T
+		U = e2f[n] | f2e[n].T
 
-		# oldA = numpy.zeros(A[n].shape, dtype=bool)
+		oldA = numpy.zeros(A[n].shape, dtype=bool)
 
-		# row = A[n].shape[0]
-		# col = A[n].shape[1]
+		row = A[n].shape[0]
+		col = A[n].shape[1]
 
-		# while numpy.array_equal(oldA,A[n]) == False:
-		# 	#Add new aligns
-		# 	oldA = A[n]
-		# 	for e in range(row):
-		# 		for f in range(col):
-		# 			if A[n][e][f] == True:
-		# 				for (i,j) in neighboring:
-		# 					e_new = e + i
-		# 					f_new = f + j
-		# 					if 0 <= e_new < row and 0 <= f_new < col:
-		# 						if numpy.sum(A[n][e_new,:]) == 0 or numpy.sum(A[n][:,f_new]) == 0 and U[e_new][f_new] == True:
-		# 							A[n][e_new][f_new] = True
+		while numpy.array_equal(oldA,A[n]) == False:
+			#Add new aligns
+			oldA = A[n]
+			for e in range(row):
+				for f in range(col):
+					if A[n][e][f] == True:
+						for (i,j) in neighboring:
+							e_new = e + i
+							f_new = f + j
+							if 0 <= e_new < row and 0 <= f_new < col:
+								if (numpy.sum(A[n][e_new,:]) == 0 or numpy.sum(A[n][:,f_new]) == 0) and U[e_new][f_new] == True:
+									A[n][e_new][f_new] = True
 
 def finalAnd(e2f_in, reverse = False):
 	for n in range(len(e2f_in)):
@@ -285,7 +285,7 @@ def finalAnd(e2f_in, reverse = False):
 
 		for e_new in range(row):
 			for f_new in range(col):
-				if numpy.sum(A[n][e_new,:]) == 0 or numpy.sum(A[n][:,f_new]) == 0 and e2f[e_new][f_new] == True:
+				if (numpy.sum(A[n][e_new,:]) == 0 or numpy.sum(A[n][:,f_new]) == 0) and e2f[e_new][f_new] == True:
 					A[n][e_new][f_new] = True
 
 def output():
