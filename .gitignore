@@ -58,3 +58,7 @@ target/
 *.gz
 
 *.out
+
+alignment/writeup/alignment.bbl
+
+alignment/writeup/alignment.blg
