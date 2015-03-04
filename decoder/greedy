@@ -2,18 +2,33 @@
 import sys
 import optparse
 import models
+import copy
 from collections import namedtuple
+
+class TranslationPair:
+	"""POJO for translation information"""
+	def __init__(self, logprob, lm_state, predecessor, phrase,
+	 fPhrase, srcStartPos, srcEndPos, srcWordCounts, srcPhraseCounts, tgtStartPos, tgtEndPos):
+		self.logprob = logprob
+		self.lm_state = lm_state
+		self.predecessor = predecessor
+		self.phrase = phrase
+		self.fPhrase = fPhrase
+		self.srcStartPos = srcStartPos
+		self.srcEndPos = srcEndPos
+		self.srcWordCounts = srcWordCounts
+		self.srcPhraseCounts = srcPhraseCounts
+		self.tgtStartPos = tgtStartPos
+		self.tgtEndPos = tgtEndPos
 
 class GreedyDecode:
 	"""Greedy Decoder"""
 	def __init__(self, opts):
 		self.tm = models.TM(opts.tm, opts.k)
 		self.lm = models.LM(opts.lm)
-		self.french = [tuple(line.strip().split()) for line in open(opts.input).readlines()[:1]]
+		self.french = [tuple(line.strip().split()) for line in open(opts.input).readlines()[:opts.num_sents]]
 		self.alpha = opts.alpha
 		self.distantThreshold = 3
-		self.translationPair = namedtuple("translationPair", \
-			"logprob, lm_state, predecessor, phrase, srcStartPos, srcEndPos, srcWordCounts, srcPhraseCounts, tgtEndPos")
 
 		# tm should translate unknown words as-is with probability 1
 		for word in set(sum(self.french,())):
@@ -25,8 +40,12 @@ class GreedyDecode:
 	def train(self):
 		# Implement greedy decoding, above shameless copy
 		for f in self.french:
-			#hillClimb(f)
-			self.seed(f)
+			h = self.hillClimb(f)
+			for pair in h:
+				if pair.predecessor is not None:
+					sys.stdout.write(pair.phrase.english + ' ')
+			sys.stdout.write('\n')
+			#print self.score(h)
 
 
 	# Initialize the translation
@@ -34,18 +53,18 @@ class GreedyDecode:
 		"""
 		Choose an initial segmentation
 		"""
-		translationPairList = self.stackDecode(f)
-		for pair in translationPairList:
-			
+		# translationPairList = self.stackDecode(f)
+		# for pair in translationPairList:
+		return self.stackDecode(f)
 
 	# Use stack decode to get maximum phrase translation
 	def stackDecode(self, f):
 		"""
-		Below comes from sample stack decoding program, but the tuple has been modified
+		Below comes from sample stack decoding program, but the tuple has been modified, 
 		to record more location information
 		"""
 		translationPairList = []
-		initial_translationPair = self.translationPair(0.0, self.lm.begin(), None, None, 0, 0, 0, 0, 0)
+		initial_translationPair = TranslationPair(0.0, self.lm.begin(), None, None,None, 0, 0, 0, 0, 0, 0)
 		stacks = [{} for _ in f] + [{}]
 		stacks[0][self.lm.begin()] = initial_translationPair
 		for i, stack in enumerate(stacks[:-1]):
@@ -62,8 +81,10 @@ class GreedyDecode:
 								(lm_state, word_logprob) = self.lm.score(lm_state, word)
 								logprob += word_logprob
 
+							logprob -= self.distortionProb(i, j)
 							logprob += self.lm.end(lm_state) if j == len(f) else 0.0
-							new_translationPair = self.translationPair(logprob, lm_state, h, phrase,i, j, i, phrase_count, tgtEndPos)
+							new_translationPair = TranslationPair(logprob, \
+								lm_state, h, phrase,f[i:j], i, j, i, phrase_count,h.tgtEndPos, tgtEndPos)
 							if lm_state not in stacks[j] or stacks[j][lm_state].logprob < logprob: # second case is recombination
 								stacks[j][lm_state] = new_translationPair
 
@@ -75,8 +96,17 @@ class GreedyDecode:
 			return
 
 		extract_english(winner)
-		# for pair in translationPairList:
-		# 	print pair.logprob, pair.phrase, pair.srcStartPos, pair.srcEndPos, pair.srcWordCounts, pair.srcPhraseCounts, pair.tgtEndPos
+
+		# def extract_english(h): 
+		# 	return "" if h.predecessor is None else "%s%s " % (extract_english(h.predecessor), h.phrase.english)
+		# print extract_english(winner)
+
+		# def extract_tm_logprob(h):
+		# 	return 0.0 if h.predecessor is None else h.phrase.logprob + extract_tm_logprob(h.predecessor)
+		# tm_logprob = extract_tm_logprob(winner)
+		# sys.stderr.write("LM = %f, TM = %f, Total = %f\n" % 
+		# (winner.logprob - tm_logprob, tm_logprob, winner.logprob))
+
 		return translationPairList
 
 	def max(t1, t2):
@@ -84,31 +114,43 @@ class GreedyDecode:
 			return t2
 		return t1
 
-
-	# Score a current translation
 	def score(self, current):
 		"""
-		Current should be a list of current translation,
+		Compute the score for current translation
+
+		current - a list of current translation for one sentence
 		"""
+		logprob = 0.0
+		lm_state = self.lm.begin()
 		for pair in current:
-			print pair
+			if pair.phrase != None and pair.fPhrase != None:
+				for phrase in self.tm[pair.fPhrase]:
+					logprob += phrase.logprob
+					for word in phrase.english.split():
+						(lm_state, word_logprob) = self.lm.score(lm_state, word)
+						logprob += word_logprob
 
+				logprob -= self.distortionProb(pair.srcStartPos, pair.srcEndPos)
+		logprob += self.lm.end(lm_state)
 
-	def distortionProb(i,j):
+		# print logprob
+		return logprob
+
+	def distortionProb(self, i,j):
 		"""
 		i is the start position of foreigh language
 		j is the end position of English phrase
 		"""
-		return alpha**abs(i-j-1)
+		return self.alpha**abs(i-j-1)
 
 	def hillClimb(self, source):
-		current = seed(source)
+		current = self.seed(source)
 		while True:
-			s_current = score(current)
+			s_current = self.score(current)
 			s = s_current
 			best = current
-			for h in neighborhood(current):
-				c = score(h)
+			for h in self.neighborhood(current):
+				c = self.score(h)
 				if c > s:
 					s = c
 					best = h
@@ -117,6 +159,177 @@ class GreedyDecode:
 			else:
 				current = best
 
+	def neighborhood(self, current):
+		return self.move(current) + self.swap(current) + self.replace(current) + self.split(current)
+		
+	def move(self, current):
+		"""
+		whenever two adjacent source phrases are translated by phrases that are distant,
+		we consider moving one of the translation closer to the other
+		"""
+		# Test data
+		# l = []
+		# l.append(TranslationPair(0.0, self.lm.begin(), None, '1',None, 0, 0, 0, 0, 0, 3))
+		# l.append(TranslationPair(0.0, self.lm.begin(), None, '2',None, 0, 0, 0, 0, 5, 9))
+		# l.append(TranslationPair(0.0, self.lm.begin(), None, '3',None, 0, 0, 0, 0, 3, 5))
+		# current = l
+		moveList = []
+		for i in xrange(1,len(current)-1):
+			mov = copy.deepcopy(current)
+			pair = mov[i]
+			adj = mov[i+1]
+			if abs(adj.tgtStartPos - pair.tgtStartPos) >= 3:
+				if adj.tgtStartPos > pair.tgtStartPos:
+					moveLen = pair.tgtEndPos - pair.tgtStartPos
+					for mp in mov:
+						if mp.tgtStartPos > pair.tgtStartPos and mp.tgtStartPos < adj.tgtStartPos:
+							mp.tgtStartPos -= moveLen
+							mp.tgtEndPos -= moveLen
+					pair.tgtEndPos = adj.tgtStartPos
+					pair.tgtStartPos = pair.tgtEndPos - moveLen
+				else:
+					moveLen = adj.tgtEndPos - adj.tgtStartPos
+					for mp in mov:
+						if mp.tgtStartPos > adj.tgtStartPos and mp.tgtStartPos < pair.tgtStartPos:
+							mp.tgtStartPos -= moveLen
+							mp.tgtEndPos -= moveLen
+					adj.tgtEndPos = adj.tgtStartPos
+					adj.tgtStartPos = adj.tgtEndPos - moveLen
+				# Sort with translation start location
+				mov = sorted(mov, key=lambda m: m.tgtStartPos)
+				moveList.append(mov)
+				# for p in mov:
+				# 	print p.phrase, p.tgtStartPos, p.tgtEndPos
+
+		# for mov in moveList:
+		# 	for n in mov:
+		# 		print n.tgtStartPos, n.tgtEndPos, n.phrase
+		return moveList
+
+	def swap(self, current):
+		swapList = []
+		for i in xrange(1,len(current)-1):
+			for j in xrange(i+1, len(current)-1):
+				swp = copy.deepcopy(current)
+				pair = swp[i]
+				adj = swp[j]
+				pairLen = pair.tgtEndPos - pair.tgtStartPos
+				adjLen = adj.tgtEndPos - adj.tgtStartPos
+				# Swap target position, and rearrange all elements between them
+				if pair.tgtStartPos > adj.tgtStartPos:
+					for m in swp:
+						if m.tgtStartPos > adj.tgtStartPos and m.tgtStartPos < pair.tgtStartPos:
+							m.tgtStartPos = m.tgtStartPos - adjLen + pairLen
+							m.tgtEndPos = m.tgtEndPos - adjLen + pairLen
+					pair.tgtStartPos = adj.tgtStartPos
+					adj.tgtEndPos = pair.tgtEndPos
+					pair.tgtEndPos = pair.tgtStartPos + pairLen
+					adj.tgtStartPos = adj.tgtEndPos - adjLen
+				else:
+					for m in swp:
+						if m.tgtStartPos > pair.tgtStartPos and m.tgtStartPos < adj.tgtStartPos:
+							m.tgtStartPos = m.tgtStartPos - pairLen + adjLen
+							m.tgtEndPos = m.tgtEndPos - pairLen + adjLen
+					adj.tgtStartPos = pair.tgtStartPos
+					pair.tgtEndPos = adj.tgtEndPos
+					adj.tgtEndPos = adj.tgtStartPos + adjLen
+					pair.tgtStartPos = pair.tgtEndPos - pairLen
+				# Sort
+				swp = sorted(swp, key=lambda m: m.tgtStartPos)
+				# for pair in swp:
+				# 	print pair.phrase, pair.tgtStartPos, pair.tgtEndPos
+				swapList.append(swp)
+
+		return swapList
+
+	def replace(self, current):
+		replaceList = []
+		for i in xrange(1,len(current)-1):
+			rep = copy.deepcopy(current)
+			pair = rep[i]
+			diffLen = 0
+			for phrase in self.tm[pair.fPhrase]:
+				# only replace if it is a different phrase
+				if phrase != pair.phrase:
+					diffLen = len(phrase.english.split()) - len(pair.phrase.english.split())
+					pair.phrase = phrase
+					pair.tgtEndPos = (pair.tgtEndPos - pair.tgtStartPos) + diffLen
+			for m in rep:
+				if m.tgtStartPos > pair.tgtStartPos:
+					m.tgtStartPos += diffLen
+					m.tgtEndPos += diffLen
+			# No need to sort, already sorted
+			replaceList.append(rep)
+
+		if not replaceList:
+			replaceList.append(current)
+
+		return replaceList
+
+	def bireplace(self, current):
+		pass
+
+	def split(self, current):
+		splitList = []
+		for i in xrange(1,len(current)-1):
+			pair = current[i]
+			fLen = len(pair.fPhrase)
+			eLen = len(pair.phrase.english.split())
+			for j in xrange(1,fLen):
+				f1 = pair.fPhrase[0:j]
+				f2 = pair.fPhrase[j:]
+				# If both in our table, try all possible combinations
+				if f1 in self.tm and f2 in self.tm:
+					spl = copy.deepcopy(current)
+					uPair = spl[i]
+					for phrase1 in self.tm[f1]:
+						p1Len = len(phrase1.english.split())
+						for phrase2 in self.tm[f2]:
+							p2Len = len(phrase2.english.split())
+							# Compute length difference, if changed, update all pair after this
+							lenDiff = eLen - (p1Len + p2Len)
+							if lenDiff != 0:
+								for m in spl:
+									if m.tgtStartPos > uPair.tgtStartPos:
+										m.tgtStartPos -= lenDiff
+										m.tgtEndPos -= lenDiff
+							# update split words
+							p2Len = len(phrase2.english.split())
+							newPair = copy.deepcopy(uPair)
+							# Update pair
+							uPair.phrase = phrase1
+							uPair.tgtEndPos = uPair.tgtStartPos + p1Len
+							# Update new pair
+							newPair.phrase = phrase2
+							newPair.tgtStartPos = uPair.tgtEndPos
+							newPair.tgtEndPos = newPair.tgtStartPos + p2Len
+							newPair.srcStartPos = i + j
+							newPair.srcEndPos = uPair.srcEndPos
+							uPair.srcEndPos = i + j
+							spl.insert(i, newPair)
+							# Add to split list
+							spl = sorted(spl, key=lambda m: m.tgtStartPos)
+							splitList.append(spl)
+							# print phrase1,phrase2
+							# for p in spl:
+							# 	print p.phrase, p.tgtStartPos, p.tgtEndPos
+		# Prevent from null
+		if not splitList:
+			splitList.append(current)
+
+		return splitList
+
+	def merge(self, current):
+		mergeList = []
+		for i in xrange(1,len(current)-1):
+			merg = copy.deepcopy(current)
+			pair = merg[i]
+			adj = merg[i+1]
+			newF = pair.fPhrase + adj.fPhrase
+			print newF
+
+
+
 def main(argv):
 	optparser = optparse.OptionParser()
 	optparser.add_option("-i", "--input", dest="input", default="data/input", help="File containing sentences to translate (default=data/input)")
@@ -124,7 +337,8 @@ def main(argv):
 	optparser.add_option("-l", "--language-model", dest="lm", default="data/lm", help="File containing ARPA-format language model (default=data/lm)")
 	optparser.add_option("-n", "--num_sentences", dest="num_sents", default=sys.maxint, type="int", help="Number of sentences to decode (default=no limit)")
 	optparser.add_option("-k", "--translations-per-phrase", dest="k", default=1, type="int", help="Limit on number of translations to consider per phrase (default=1)")
-	optparser.add_option("-s", "--stack-size", dest="alpha", default=0.05, type="float", help="Distortion Constant (default=0.05)")
+	optparser.add_option("-a", "--alpha-base", dest="alpha", default=0.3, type="float", help="Distortion Constant (default=0.05)")
+	optparser.add_option("-s", "--stack-size", dest="s", default=1, type="int", help="Maximum stack size (default=1)")
 	opts = optparser.parse_args()[0]
 
 	gd = GreedyDecode(opts)
