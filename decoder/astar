@@ -1,0 +1,101 @@
+#!/usr/bin/env python
+import sys
+import optparse
+import models
+import copy
+import heapq as hq
+
+class PriorityQueue(object):
+	"""A simple implementation of priority queue"""
+	def __init__(self, maxsize):
+		self.pqueue = []
+		self.maxsize = maxsize
+
+	def push(self, item):
+		hq.heappush(self.pqueue, item)
+		if len(self.pqueue) == self.maxsize:
+			self.pqueue = hq.nsmallest(self.maxsize, self.pqueue)
+
+	def pop(self):
+		return hq.heappop(self.pqueue)
+
+	def merge(self, itemList):
+		"""
+		A list of hypothesis, sort by score
+		"""
+		for item in itemList:
+			hq.heappush(self.pqueue, item)
+		self.pqueue = hq.nsmallest(self.maxsize, self.pqueue)
+		
+
+class TM_State:
+	"""POJO for translation states"""
+	def __init__(self, coverSet = None, previousWord = None, emptyAlignCount = None):
+		self.coverSet = coverSet
+		self.previousWord = previousWord
+		self.emptyAlignCount = emptyAlignCount
+		self.isOpen = True
+		self.isComplete = False
+
+class Hypo:
+	"""POJO for hypothesis"""
+	def __init__(self, score = 0.0, predecessor = None, tm_state = TM_State(), lm_state = None, phrase = None):
+		self.score = score
+		self.predecessor = predecessor
+		self.lm_state = lm_state
+		self.tm_state = tm_state
+		self.phrase = phrase
+
+	def __eq__(self, other):
+		return (self.tm_state == tm_state and \
+			self.lm_state == other.lm_state and self.phrase == other.phrase)
+
+class AstarSearch:
+	"""Greedy Decoder"""
+	def __init__(self, opts):
+		self.tm = models.TM(opts.tm, opts.k)
+		self.lm = models.LM(opts.lm)
+		self.french = [tuple(line.strip().split()) for line in open(opts.input).readlines()[:1]]
+		self.alpha = opts.alpha
+		self.distantThreshold = 3
+
+		# tm should translate unknown words as-is with probability 1
+		for word in set(sum(self.french,())):
+			if (word,) not in self.tm:
+				self.tm[(word,)] = [models.phrase(word, 0.0)]
+
+		sys.stderr.write("Decoding %s...\n" % (opts.input,))
+
+	def train(self):
+		for f in self.french:
+			search(f)
+		
+	def search(self, f):
+		pQueue = PriorityQueue(10000)
+		pQueue.push(Hypo())
+		best = pQueue.pop()
+		# Do while not get the best path
+		while not best.isComplete:
+			ext = []
+			
+
+	def score(self):
+		pass
+
+
+def main(argv):
+	optparser = optparse.OptionParser()
+	optparser.add_option("-i", "--input", dest="input", default="data/input", help="File containing sentences to translate (default=data/input)")
+	optparser.add_option("-t", "--translation-model", dest="tm", default="data/tm", help="File containing translation model (default=data/tm)")
+	optparser.add_option("-l", "--language-model", dest="lm", default="data/lm", help="File containing ARPA-format language model (default=data/lm)")
+	optparser.add_option("-n", "--num_sentences", dest="num_sents", default=sys.maxint, type="int", help="Number of sentences to decode (default=no limit)")
+	optparser.add_option("-k", "--translations-per-phrase", dest="k", default=5, type="int", help="Limit on number of translations to consider per phrase (default=1)")
+	optparser.add_option("-a", "--alpha-base", dest="alpha", default=0.5, type="float", help="Distortion Constant (default=0.05)")
+	optparser.add_option("-s", "--stack-size", dest="s", default=1, type="int", help="Maximum stack size (default=1)")
+	opts = optparser.parse_args()[0]
+
+	astar = AstarSearch(opts)
+	astar.train()
+
+if __name__=='__main__':
+	main(sys.argv)
