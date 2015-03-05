@@ -62,3 +62,7 @@ target/
 alignment/writeup/alignment.bbl
 
 alignment/writeup/alignment.blg
+
+*.bbl
+
+*.blg

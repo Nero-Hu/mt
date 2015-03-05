@@ -1,0 +1,163 @@
+\documentclass[11pt]{article}
+
+\usepackage{graphicx}
+\usepackage{wrapfig}
+\usepackage{url}
+\usepackage{wrapfig}
+\usepackage{color}
+\usepackage{marvosym}
+\usepackage{enumerate}
+\usepackage{subfigure}
+\usepackage{tikz}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{hyperref}
+\usepackage{CJKutf8}
+\usepackage{listings}
+\usepackage[encapsulated]{CJK}
+% set the default code style
+\lstset{
+    frame=tb, % draw a frame at the top and bottom of the code block
+    tabsize=2
+}
+
+\oddsidemargin 0mm
+\evensidemargin 5mm
+\topmargin -20mm
+\textheight 240mm
+\textwidth 160mm
+
+\newcommand{\vw}{{\bf w}}
+\newcommand{\vx}{{\bf x}}
+\newcommand{\vy}{{\bf y}}
+\newcommand{\vxi}{{\bf x}_i}
+\newcommand{\yi}{y_i}
+\newcommand{\vxj}{{\bf x}_j}
+\newcommand{\vxn}{{\bf x}_n}
+\newcommand{\yj}{y_j}
+\newcommand{\ai}{\alpha_i}
+\newcommand{\aj}{\alpha_j}
+\newcommand{\X}{{\bf X}}
+\newcommand{\Y}{{\bf Y}}
+\newcommand{\vz}{{\bf z}}
+\newcommand{\msigma}{{\bf \Sigma}}
+\newcommand{\vmu}{{\bf \mu}}
+\newcommand{\vmuk}{{\bf \mu}_k}
+\newcommand{\msigmak}{{\bf \Sigma}_k}
+\newcommand{\vmuj}{{\bf \mu}_j}
+\newcommand{\msigmaj}{{\bf \Sigma}_j}
+\newcommand{\pij}{\pi_j}
+\newcommand{\pik}{\pi_k}
+\newcommand{\D}{\mathcal{D}}
+\newcommand{\el}{\mathcal{L}}
+\newcommand{\N}{\mathcal{N}}
+\newcommand{\vxij}{{\bf x}_{ij}}
+\newcommand{\vt}{{\bf t}}
+\newcommand{\yh}{\hat{y}}
+\newcommand{\code}[1]{{\footnotesize \tt #1}}
+\newcommand{\alphai}{\alpha_i}
+
+\pagestyle{myheadings}
+\markboth{Haitang Hu}{Machine Translation : Homework 2}
+
+
+\title{Machine Translation\\Decode}
+\author{Haitang Hu \\
+  {\tt hthu@cs.jhu.edu}}
+\date{\today}
+
+\begin{document}
+\large
+\maketitle
+\thispagestyle{headings}
+\noindent
+\textbf{This greedy decoder is based on the work of Philippe Langlais et al.\cite{greedy}}
+
+\section{Intuition} % (fold)
+\label{sec:intuition}
+The intuition behind the greedy decoder is a simple hill climb process: we start from a \textbf{seed} of translation, as our initial start point. Then, we define a set of \textbf{neighbors}, as possible options, and we use our \textbf{score} function to choose the best translation. We keep doing iteration until we find a local optimal(namely the hill), and we are done.\\
+Note that this method does not guarantee the best translation, since it is not search all the possible space, but practically this works pretty well. 
+% section intuition (end)
+
+\section{Components} % (fold)
+\label{sec:components}
+\subsection{Seed} % (fold)
+\label{sub:seed}
+``In our case, we select the segmentation which involves the minimum number of source phrases belonging to the translation model that cover maximally the source sentence.\cite{greedy}'' This could gain us a better search space for translation options, since the minimum coverage could give us more freedom to combine \textbf{split}, \textbf{swap} tranformations, so that we have more possbility to find a better local optimal(jump out a local optimal). But this is currently unimplemented, instead, we are currently using a \textit{stack decode} algorithm as our initialization, which simply consider the best probability on the sum of \textbf{translation model} score and \textbf{language model} score.
+% subsection seed (end)
+
+\subsection{Score} % (fold)
+\label{sub:score}
+Our score function is composed by:
+\begin{itemize}
+	\item Translation Model Score\\
+	Just simply the phrase translation log-probability.
+	\item Language Model Score\\
+	A trigram language model log-probability.
+	\item Distortion Penalization\\
+	The score of the translation position difference $j$ and $j^{\prime}$.
+\end{itemize}
+Combine above, our score function\cite{spt} can be written as:
+$$ Score(f,e) = \log p_{lm}(f) + \sum_i^f \log p_{tm}(f_i|e_i) + \sum_j^f d(a_j,a_{j-1})$$
+Where $$ d(a_j,a_{j-1}) = \alpha^{|a_j - a_{j-1} -1|}$$
+The value of $\alpha$ will be discussed in later section.
+% subsection score (end)
+
+\subsection{Neighbors} % (fold)
+\label{sub:neighbors}
+We defines $6$ kinds of operations, to form a neighbor sets:
+\begin{enumerate}[a.]
+	\item \textbf{Move}\\
+	If the adjacent source are translated to be far from each other, we try to move this two phrase closer.
+	\item \textbf{Swap}\\
+	Swap the translation for any two pair of phrase. Note that this actually includes \textbf{Move}, while the standard version of \textbf{Swap} is only applied on adjacent source pairs.
+	\item \textbf{Split}\\
+	Split the current source phrase into $2$ phrases.
+	\item \textbf{Merge}\\
+	Merge two adjacent source phrase into one.
+	\item \textbf{Replace} \& \textbf{Bi-replace}\\
+	Replace the current phrase with other translation, or replace adjacent source pairs simultaneously.
+\end{enumerate}
+These operations allow us to explore more of the search space.
+% subsection neighbors (end)
+% section components (end)
+
+\section{Evaluation} % (fold)
+\label{sec:evaluation}
+\subsection{Phrase Options} % (fold)
+\label{sub:phrase_options}
+Since we are allowing $6$ operations above, we want to explore more search space. It is natural that we put more phrase translation options, so that we could form different language model and settings. After several experiments, it shows that from $1$ phrase options to $5$, the score is raised most, after $5$ the score is imporved slowly while taking a long time to train.
+\begin{table}[!htf]
+\centering
+\begin{tabular}{ | c | c | c |}
+\hline
+Phrase Options & Score & Time \\
+\hline
+$1$ & $-1352.89$ & $8.7s$ \\
+\hline
+$5$ & $-1308.87$ & $35.8s$\\
+\hline
+$10$ & $-1307.65$ & $63.4s$\\
+\hline
+\end{tabular}
+\caption{Phrase Options}
+\end{table}
+% subsection phrase_options (end)
+\subsection{Distortion Base} % (fold)
+\label{sub:distortion_base}
+The distortion base decides how much will we penalize for our distortion. Since we want more search space, so we should not penalize too heavy. $\alpha = 0.05$ is a decent value to get a better score.
+% subsection distortion_base (end)
+
+\subsection{Stack Size} % (fold)
+\label{sub:stack_size}
+Since we are only using \textit{Stack Decode} for initialization, the stack size affects a little on the final score, only around $0.5$ are improved while increasing stack size from $1 \to 10$. So for efficiency we just set the stack size to be equal to $1$.
+% subsection stack_size (end)
+% section evaluation (end)
+\begin{thebibliography}{50}
+\bibitem{greedy} Philippe Langlais, Alexandre Patry and Fabrizio Gotti. \textsl{A Greedy Decoder for Phrase-Based Statistical Machine Translation}, 2007, \url{http://www.iro.umontreal.ca/~felipe/bib2webV0.81/cv/papers/paper-tmi-2007.pdf}
+
+\bibitem{spt} Philipp Koehn, Franz Josef Och, Daniel Marcu. \textsl{Statistical Phrase-Based Translation}, 2003, \url{http://www.isi.edu/~marcu/papers/phrases-hlt2003.pdf}
+
+\bibitem{aam} Philipp Koehn. \textsl{Decoding}, 2015, \url{http://mt-class.org/jhu/slides/lecture-decoding.pdf}
+\end{thebibliography}
+\end{document}

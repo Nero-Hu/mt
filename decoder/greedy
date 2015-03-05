@@ -112,7 +112,6 @@ class GreedyDecoder:
 
 				logprob -= self.distortionProb(pair.tgtStartPos, pair.tgtEndPos)
 		logprob += self.lm.end(lm_state)
-
 		# print 'score : ' + str(logprob)
 		return logprob
 
@@ -157,31 +156,58 @@ class GreedyDecoder:
 		moveList = []
 		sortCurrent = sorted(current, key=lambda m: m.srcStartPos)
 		for i in xrange(1,len(sortCurrent)-1):
-			mov = copy.deepcopy(sortCurrent)
-			pair = mov[i]
-			adj = mov[i+1]
+			pair = current[i]
+			adj = current[i+1]
 			if abs(adj.tgtStartPos - pair.tgtStartPos) >= self.distantThreshold:
-				if adj.tgtStartPos > pair.tgtStartPos:
-					moveLen = pair.tgtEndPos - pair.tgtStartPos
-					for mp in mov:
-						if mp.tgtStartPos > pair.tgtStartPos and mp.tgtStartPos < adj.tgtStartPos:
-							mp.tgtStartPos -= moveLen
-							mp.tgtEndPos -= moveLen
-					pair.tgtEndPos = adj.tgtStartPos
-					pair.tgtStartPos = pair.tgtEndPos - moveLen
-				else:
-					moveLen = adj.tgtEndPos - adj.tgtStartPos
-					for mp in mov:
-						if mp.tgtStartPos > adj.tgtStartPos and mp.tgtStartPos < pair.tgtStartPos:
-							mp.tgtStartPos -= moveLen
-							mp.tgtEndPos -= moveLen
-					adj.tgtEndPos = adj.tgtStartPos
-					adj.tgtStartPos = adj.tgtEndPos - moveLen
-				# Sort with translation start location
-				mov = sorted(mov, key=lambda m: m.tgtStartPos)
-				moveList.append(mov)
+					mov = copy.deepcopy(sortCurrent)
+					moveList.append(self.moveForward(mov,i))
+					moveList.append(self.moveBackward(mov,i))
 				
 		return moveList
+
+	def moveForward(self, mov, i):
+		pair = mov[i]
+		adj = mov[i+1]
+		if adj.tgtStartPos > pair.tgtStartPos:
+			moveLen = pair.tgtEndPos - pair.tgtStartPos
+			for mp in mov:
+				if mp.tgtStartPos > pair.tgtStartPos and mp.tgtStartPos < adj.tgtStartPos:
+					mp.tgtStartPos -= moveLen
+					mp.tgtEndPos -= moveLen
+			pair.tgtEndPos = adj.tgtStartPos
+			pair.tgtStartPos = pair.tgtEndPos - moveLen
+		else:
+			moveLen = adj.tgtEndPos - adj.tgtStartPos
+			for mp in mov:
+				if mp.tgtStartPos > adj.tgtStartPos and mp.tgtStartPos < pair.tgtStartPos:
+					mp.tgtStartPos -= moveLen
+					mp.tgtEndPos -= moveLen
+			adj.tgtEndPos = adj.tgtStartPos
+			adj.tgtStartPos = adj.tgtEndPos - moveLen
+		
+		return sorted(mov, key=lambda m: m.tgtStartPos)
+
+	def moveBackward(self, mov, i):
+		pair = mov[i]
+		adj = mov[i+1]
+		if adj.tgtStartPos > pair.tgtStartPos:
+			moveLen = adj.tgtEndPos - adj.tgtStartPos
+			for mp in mov:
+				if mp.tgtStartPos > pair.tgtStartPos and mp.tgtStartPos < adj.tgtStartPos:
+					mp.tgtStartPos += moveLen
+					mp.tgtEndPos += moveLen
+			adj.tgtStartPos = pair.tgtEndPos
+			adj.tgtEndPos = adj.tgtStartPos + moveLen
+		else:
+			moveLen = pair.tgtEndPos - pair.tgtStartPos
+			for mp in mov:
+				if mp.tgtStartPos > adj.tgtStartPos and mp.tgtStartPos < pair.tgtStartPos:
+					mp.tgtStartPos += moveLen
+					mp.tgtEndPos += moveLen
+			pair.tgtStartPos = adj.tgtEndPos
+			pair.tgtEndPos = pair.tgtStartPos + moveLen
+		
+		return sorted(mov, key=lambda m: m.tgtStartPos)
 
 	def swap(self, current):
 		"""
@@ -275,8 +301,7 @@ class GreedyDecoder:
 									m.tgtEndPos += diffLen
 							rep2.tgtEndPos = (rep2.tgtEndPos - rep2.tgtStartPos) + diffLen
 							rep2.tgtStartPos = rep1.tgtEndPos
-							# for p in birep:
-							# 	print p.srcStartPos, p.srcEndPos, p.phrase, p.tgtStartPos, p.tgtEndPos
+							
 							bireplaceList.append(birep)
 
 		if not bireplaceList:
@@ -332,10 +357,7 @@ class GreedyDecoder:
 							# Add to split list
 							spl = sorted(spl, key=lambda m: m.tgtStartPos)
 							splitList.append(spl)
-							# print uPair.fPhrase, newPair.fPhrase, len(f1),len(f2), i, j
-							# print phrase1,phrase2
-							# for p in spl:
-							# 	print p.srcStartPos, p.srcEndPos, p.phrase, p.tgtStartPos, p.tgtEndPos
+							
 		# Prevent from null
 		if not splitList:
 			splitList.append(current)
@@ -375,8 +397,7 @@ class GreedyDecoder:
 					merg[i].tgtEndPos = adj.tgtEndPos + lenDiff
 					merg = sorted(merg, key=lambda m: m.tgtStartPos)
 					mergeList.append(merg)
-					# for p in merg:
-					# 	print p.srcStartPos, p.srcEndPos, p.phrase, p.tgtStartPos, p.tgtEndPos
+			# Try a 3 phrase merge
 			if (i + 2) <= len(sortCurrent)-1:
 				adj2 = sortCurrent[i+2]
 				newF = pair.fPhrase + adj.fPhrase + adj2.fPhrase
@@ -403,8 +424,6 @@ class GreedyDecoder:
 						merg = sorted(merg, key=lambda m: m.tgtStartPos)	
 						#For index
 						mergeList.append(merg)
-						# for p in merg:
-						# 	print p.srcStartPos, p.srcEndPos, p.phrase, p.tgtStartPos, p.tgtEndPos
 
 		if not mergeList:
 			mergeList.append(current)
@@ -418,9 +437,9 @@ def main(argv):
 	optparser.add_option("-l", "--language-model", dest="lm", default="data/lm", help="File containing ARPA-format language model (default=data/lm)")
 	optparser.add_option("-n", "--num_sentences", dest="num_sents", default=sys.maxint, type="int", help="Number of sentences to decode (default=no limit)")
 	optparser.add_option("-k", "--translations-per-phrase", dest="k", default=5, type="int", help="Limit on number of translations to consider per phrase (default=1)")
-	optparser.add_option("-a", "--alpha-base", dest="alpha", default=0.005, type="float", help="Distortion Constant (default=0.005)")
+	optparser.add_option("-a", "--alpha-base", dest="alpha", default=0.05, type="float", help="Distortion Constant (default=0.005)")
 	optparser.add_option("-s", "--stack-size", dest="s", default=1, type="int", help="Maximum stack size (default=1)")
-	optparser.add_option("-d", "--distortion", dest="dt", default=1, type="int", help="Distortion threshold for move(default=3)")
+	optparser.add_option("-d", "--distortion", dest="dt", default=1, type="int", help="Distortion threshold for move(default=1)")
 	opts = optparser.parse_args()[0]
 
 	gd = GreedyDecoder(opts)
