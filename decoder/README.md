@@ -1,11 +1,13 @@
+Following from [Machine Translation][1] class at JHU.
+
 There are two python programs here (-h for usage):
 
--`decode` translates input sentences from French to English.
+-`greedy` translates input sentences from French to English.
 -`grade` computes the model score of a translated sentence.
 
 These commands work in a pipeline. For example:
 
-    > python decode | python compute-model-score
+    > ./greedy | ./compute-model-score
 
 There is also a module:
 
@@ -31,3 +33,5 @@ originally aligned by Ulrich Germann:
 
 The language model and translation model are computed from the data 
 in the align directory, using alignments from the Berkeley aligner.
+
+[1]: http://mt-class.org/jhu/hw2.html
