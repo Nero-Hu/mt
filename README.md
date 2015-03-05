@@ -1,5 +1,4 @@
-# MT
-Machine Translation Reporsitory
+###Machine Translation Reporsitory
 
 The reporsitory contains following:
 
