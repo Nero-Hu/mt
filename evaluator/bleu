@@ -1,0 +1,112 @@
+#!/usr/bin/env python
+import argparse # optparse is deprecated
+from itertools import islice # slicing for iterators
+from collections import defaultdict
+import math
+ 
+def main():
+    parser = argparse.ArgumentParser(description='Evaluate translation hypotheses.')
+    parser.add_argument('-i', '--input', default='data/hyp1-hyp2-ref',
+            help='input file (default data/hyp1-hyp2-ref)')
+    parser.add_argument('-n', '--num_sentences', default=None, type=int,
+            help='Number of hypothesis pairs to evaluate')
+    parser.add_argument('-a', '--alpha', default=0.5, type=float,
+            help='Number of hypothesis pairs to evaluate')
+    # note that if x == [1, 2, 3], then x[:None] == x[:] == x (copy); no need for sys.maxint
+    opts = parser.parse_args()
+ 
+    # we create a generator and avoid loading all sentences into a list
+    def sentences():
+        with open(opts.input) as f:
+            for pair in f:
+                yield [sentence.strip().split() for sentence in pair.split(' ||| ')]
+
+    global wordDict
+    wordDict = {}
+    # Load wordnet dictionary
+    with open("core-wordnet.txt") as f:
+        for line in f:
+            words = line.strip().replace('[', '').replace(']', '').split()
+            if words[3:]:
+                wordDict[words[2]] = words[3:]
+
+    for h1, h2, ref in islice(sentences(), opts.num_sentences):
+        # Compute blue score for h1 and h2, pick the higher blue score
+        p1, p2 = computeBlue(h1,h2,ref)
+
+        print(1 if p1 > p2 else # \begin{cases}
+            (0 if p1 == p2
+            else -1)) # \end{cases}
+
+def computeBlue(h1, h2, ref):
+    #Compute brevity penalty
+    bp1 = min(1.0, math.exp(1-float(len(ref))/float(len(h1))))
+    bp2 = min(1.0, math.exp(1-float(len(ref))/float(len(h2))))
+    #First construct n gram and its maximum counts in reference
+    gDict = []
+    h1Dict = []
+    h2Dict = []
+    for i in range(4):
+        gDict.append(defaultdict(float))
+        h1Dict.append(defaultdict(float))
+        h2Dict.append(defaultdict(float))
+
+    for i in range(len(ref)):
+        for j in xrange(i+1,i+5):
+            if j > len(ref):
+                break
+            gDict[j-i-1][tuple(ref[i:j])] += 1
+
+    for i in range(len(h1)):
+        for j in xrange(i+1,i+5):
+            if j > len(h1):
+                break
+            if tuple(h1[i:j]) in gDict[j-i-1].keys():
+                h1Dict[j-i-1][tuple(h1[i:j])] += 1
+                # modified counts
+                h1Dict[j-i-1][tuple(h1[i:j])] = min(h1Dict[j-i-1][tuple(h1[i:j])], gDict[j-i-1][tuple(h1[i:j])])
+            elif j-i == 2 and j < len(h1):
+                if tuple([h1[i],h1[j]]) in gDict[j-i-1].keys():
+                    h1Dict[j-i-1][tuple(h1[i:j])] += 1
+                    # modified counts
+                    h1Dict[j-i-1][tuple(h1[i:j])] = min(h1Dict[j-i-1][tuple(h1[i:j])], gDict[j-i-1][tuple(h1[i:j])])
+    
+    for i in range(len(h2)):
+        for j in xrange(i+1,i+5):
+            if j > len(h2):
+                break
+            if tuple(h2[i:j]) in gDict[j-i-1].keys():
+                h2Dict[j-i-1][tuple(h2[i:j])] += 1
+                # modified counts
+                h2Dict[j-i-1][tuple(h2[i:j])] = min(h2Dict[j-i-1][tuple(h2[i:j])], gDict[j-i-1][tuple(h2[i:j])])
+            elif j-i == 2 and j < len(h2):
+                if tuple([h2[i],h2[j]]) in gDict[j-i-1].keys():
+                    h1Dict[j-i-1][tuple(h2[i:j])] += 1
+                    # modified counts
+                    h1Dict[j-i-1][tuple(h2[i:j])] = min(h1Dict[j-i-1][tuple(h2[i:j])], gDict[j-i-1][tuple(h2[i:j])])
+
+    p1 = bp1
+    p2 = bp2
+    for i in range(4):
+        if i == 1:
+            tp1 = (sum(h1Dict[i].values()) +1) / max((float(len(h1)-i+1)) * (float(len(h1)-i)) / 2,1.0)
+            tp2 = (sum(h2Dict[i].values()) +1) / max((float(len(h2)-i+1)) * (float(len(h2)-i)) / 2,1.0)
+        else:
+            tp1 = (sum(h1Dict[i].values()) +1) / max((float(len(h1)-i+1)),1.0)
+            tp2 = (sum(h2Dict[i].values()) +1) / max((float(len(h2)-i+1)),1.0)
+        # if tp1 == 0:
+        #     inv1 *= 2
+        #     tp1 = 1.0 / inv1
+        # if tp2 == 0:
+        #     inv2 *= 2
+        #     tp2 = 1.0 / inv2
+
+        p1 *= math.pow(tp1,0.25)
+        p2 *= math.pow(tp2,0.25)
+
+    return p1,p2
+    
+
+# convention to allow import of this file as a module
+if __name__ == '__main__':
+    main()
