@@ -21,13 +21,16 @@ def main():
         with open(opts.input) as f:
             for pair in f:
                 yield [sentence.strip().split() for sentence in pair.split(' ||| ')]
-	
+
 	# Calculate precision and recall, and f score
     for h1, h2, ref in islice(sentences(), opts.num_sentences):
-        p1 = word_matches(h1,ref)
-        p2 = word_matches(h2,ref)
-        r1 = word_matches(ref,h1)
-        r2 = word_matches(ref,h2)
+        c1 = word_matches(h1,ref)
+        c2 = word_matches(h2,ref)
+        p1 = float(c1) / float(len(h1))
+        p2 = float(c2) / float(len(h2))
+        r1 = float(c1) / float(len(ref))
+        r2 = float(c2) / float(len(ref))
+
         if p1 == 0 and r1 == 0:
             if p2 == 0 and r2 == 0:
                 print 0
