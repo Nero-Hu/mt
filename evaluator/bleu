@@ -37,12 +37,9 @@ def main():
             stopWordList = pair.strip().split()
 
     def removeStopWord(inStr):
-        return [re.sub(r'[^\w\s]','',removedList) for removedList in inStr]
+        return [re.sub(r'[^\w\s]','',removedList) for removedList in inStr if removedList not in stopWordList]
 
     def computeBlue(h1, h2, ref):
-        h1 = removeStopWord(h1)
-        h2 = removeStopWord(h2)
-        ref = removeStopWord(ref)
         #Compute brevity penalty
         bp1 = min(1.0, math.exp(1-float(len(ref))/float(len(h1))))
         bp2 = min(1.0, math.exp(1-float(len(ref))/float(len(h2))))
@@ -96,10 +93,10 @@ def main():
             #     inv2 *= 50.0/max(math.log(len(h2)),1.0)
             #     tp2 = 1.0 / inv2
 
-            p1 *= math.pow(tp1,(ng-i)/sumNg)
-            p2 *= math.pow(tp2,(ng-i)/sumNg)
-            # p1 *= math.pow(tp1,1.0/ng)
-            # p2 *= math.pow(tp2,1.0/ng)
+            # p1 *= math.pow(tp1,(ng-i)/sumNg)
+            # p2 *= math.pow(tp2,(ng-i)/sumNg)
+            p1 *= math.pow(tp1,1.0/ng)
+            p2 *= math.pow(tp2,1.0/ng)
 
         return p1,p2
 
