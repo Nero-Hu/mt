@@ -1,0 +1,123 @@
+#!/usr/bin/env python
+import argparse # optparse is deprecated
+from itertools import islice # slicing for iterators
+from functools import wraps
+ 
+def main():
+    sys.setrecursionlimit(10000)
+    parser = argparse.ArgumentParser(description='Evaluate translation hypotheses.')
+    parser.add_argument('-i', '--input', default='data/hyp1-hyp2-ref',
+            help='input file (default data/hyp1-hyp2-ref)')
+    parser.add_argument('-n', '--num_sentences', default=None, type=int,
+            help='Number of hypothesis pairs to evaluate')
+    parser.add_argument('-l', '--lamb', default=0.5, type=float,
+            help='Weight parameter lambda')
+    parser.add_argument('-k', '--length', default=4, type=float,
+            help='Subsequence length for String Kernel')
+    # note that if x == [1, 2, 3], then x[:None] == x[:] == x (copy); no need for sys.maxint
+    opts = parser.parse_args()
+
+    k = opts.length
+    lamb = opts.lamb
+
+    def caching():
+        """
+        Cache decorator. Arguments to the cached function must be hashable.
+        """
+        def decorate_func(func):
+            cache = dict()
+            # separating positional and keyword args
+            kwarg_point = object()
+
+            @wraps(func)
+            def cache_value(*args, **kwargs):
+                key = args
+                if kwargs:
+                    key += (kwarg_point,) + tuple(sorted(kwargs.items()))
+                if key in cache:
+                    result = cache[key]
+                else:
+                    result = func(*args, **kwargs)
+                    cache[key] = result
+                return result
+
+            def cache_clear():
+                """
+                Clear the cache
+                """
+                cache.clear()
+                # Clear the cache
+            cache_value.cache_clear = cache_clear
+            return cache_value
+        return decorate_func
+
+
+    # we create a generator and avoid loading all sentences into a list
+    def sentences():
+        with open(opts.input) as f:
+            for pair in f:
+                #Now we need string, not list
+                yield [sentence.strip() for sentence in pair.split(' ||| ')]
+
+    @caching()
+    # Recursively computing similarity between 2 string using SSK
+    def K(n,s,t):
+        if min(len(s),len(t)) < n:
+            return 0.0
+          
+        pSum = 0
+        for j in range(1, len(t)):
+            if t[j] == s[-1]:
+                pSum += KP(n - 1, s[:-1], t[:j])
+        score = K(n, s[:-1], t) + lamb ** 2 * pSum
+        return score
+
+    # Computing K' recursively
+    @caching()
+    def KP(n,s,t):
+        if n==0:
+            return 1.0
+        elif min(len(s),len(t)) < n:
+            return 0.0
+        else:
+            score = KPP(n, s, t) + lamb * KP(n, s[:-1], t)
+            return score
+
+    # Compute K'' recursively
+    @caching()
+    def KPP(n,s,t):
+        if n == 0:
+            return 1.0
+        elif min(len(s), len(t)) < n:
+            return 0.0
+        else:
+            if s[-1] == t[-1]:
+                return lamb * (KPP(n, s, t[:-1]) + lamb * KP(n - 1, s[:-1], t[:-1]))
+            else:
+                return lamb * KPP(n, s, t[:-1])
+
+    # #Remove stop words
+    # stopWordList = []
+    # with open("eng-stop-words.txt") as f:
+    #     for pair in f:
+    #         stopWordList = pair.strip().split()
+
+    # def removeStopWord(inStr):
+    #     return [removedList for removedList in inStr if removedList not in stopWordList]
+    
+	# Calculate precision and recall, and f score
+    for h1, h2, ref in islice(sentences(), opts.num_sentences):
+        #Remove stop words in ref too
+        s1 = K(k,h1,ref)
+        s2 = K(k,h2,ref)
+
+        print s1,s2
+        print(1 if s1 > s2 else # \begin{cases}
+            (0 if s1 == s2
+            else -1)) # \end{cases}
+
+    
+
+# convention to allow import of this file as a module
+if __name__ == '__main__':
+    main()

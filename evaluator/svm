@@ -1,10 +1,13 @@
 #!/usr/bin/env python
 import argparse # optparse is deprecated
 from itertools import islice # slicing for iterators
-from collections import defaultdict
-import stemmer
-import math
+from itertools import izip
 import re
+import numpy as np
+from collections import defaultdict
+from sklearn.multiclass import OneVsRestClassifier
+from sklearn.svm import LinearSVC
+from sklearn.svm import SVC
  
 def main():
     parser = argparse.ArgumentParser(description='Evaluate translation hypotheses.')
@@ -19,12 +22,12 @@ def main():
     # note that if x == [1, 2, 3], then x[:None] == x[:] == x (copy); no need for sys.maxint
     opts = parser.parse_args()
     ng = opts.ngram
-    sumNg = 0.0
-    for i in range(ng):
-        sumNg += i+1
+    feaNum = 16
 
-    stm = stemmer.Stemmer()
-    # we create a generator and avoid loading all sentences into a list
+    featureVec = []
+    labelVec = []
+    predVec = []
+
     def sentences():
         with open(opts.input) as f:
             for pair in f:
@@ -32,21 +35,18 @@ def main():
 
     #Remove stop words
     stopWordList = []
+    puncList=[',','?','!',':',';','-']
     with open("eng-stop-words.txt") as f:
         for pair in f:
             stopWordList = pair.strip().split()
 
     def removeStopWord(inStr):
-        return [re.sub(r'[^\w\s]','',removedList) for removedList in inStr]
+        #Use regex to remove punctuation
+        return [re.sub(r'[^\w\s]','',removedList) for removedList in inStr if removedList not in stopWordList]
 
-    def computeBlue(h1, h2, ref):
-        h1 = removeStopWord(h1)
-        h2 = removeStopWord(h2)
-        ref = removeStopWord(ref)
-        #Compute brevity penalty
-        bp1 = min(1.0, math.exp(1-float(len(ref))/float(len(h1))))
-        bp2 = min(1.0, math.exp(1-float(len(ref))/float(len(h2))))
-        #First construct n gram and its maximum counts in reference
+    def collectFeature(h1, h2, ref):
+        fVec = [0.0] * feaNum * 2
+        #First compute h1 word vec
         gDict = []
         h1Dict = []
         h2Dict = []
@@ -79,39 +79,64 @@ def main():
                     h2Dict[j-i-1][tuple(h2[i:j])] += 1.0
                     # modified counts
                     h2Dict[j-i-1][tuple(h2[i:j])] = min(h2Dict[j-i-1][tuple(h2[i:j])], gDict[j-i-1][tuple(h2[i:j])])
-               
-        p1 = bp1
-        p2 = bp2
+
+        # get ngram precision, recall, f-measure
         for i in range(ng):
-            # Smoothed bleu
-            tp1 = (sum(h1Dict[i].values()) +1.0) / max(len(h1)-i+1.0,1.0)
-            tp2 = (sum(h2Dict[i].values()) +1.0) / max(len(h2)-i+1.0,1.0)
+            sc1 = sum(h1Dict[i].values()) +1.0
+            sc2 = (sum(h2Dict[i].values()) +1.0)
+            #Precision
+            fVec[i] = sc1 / max(len(h1)-i+1.0,1.0)
+            fVec[i+feaNum] = sc2 / max(len(h1)-i+1.0,1.0)
+            #Recall
+            fVec[i+4] = sc1 / max(len(ref)-i+1.0,1.0)
+            fVec[i+4+feaNum] = sc2 / max(len(ref)-i+1.0,1.0)
+            #F measure
+            fVec[i+8] = 2.0 * fVec[i] * fVec[i+4] / (fVec[i] + fVec[i+4])
+            fVec[i+8+feaNum] = 2.0 * fVec[i+feaNum] * fVec[i+4+feaNum] / (fVec[i+feaNum] + fVec[i+4+feaNum])
 
-            # tp1 = sum(h1Dict[i].values()) / max(float(len(h1)-i),1.0)
-            # tp2 = sum(h2Dict[i].values()) / max(float(len(h2)-i),1.0)
-            # if tp1 == 0:
-            #     inv1 *= 50.0/ max(math.log(len(h1)),1.0)
-            #     tp1 = 1.0 / inv1
-            # if tp2 == 0:
-            #     inv2 *= 50.0/max(math.log(len(h2)),1.0)
-            #     tp2 = 1.0 / inv2
+        # Get average n-gram precision
+        fVec[12] = 0.25 * (fVec[0] + fVec[1] + fVec[2] + fVec[3])
+        fVec[12+feaNum] = 0.25 * (fVec[feaNum] + fVec[feaNum+1] + fVec[feaNum+2] + fVec[feaNum+3])
 
-            p1 *= math.pow(tp1,(ng-i)/sumNg)
-            p2 *= math.pow(tp2,(ng-i)/sumNg)
-            # p1 *= math.pow(tp1,1.0/ng)
-            # p2 *= math.pow(tp2,1.0/ng)
+        #Get word count
+        fVec[13] = len(h1)
+        fVec[13+feaNum] = len(h2)
 
-        return p1,p2
+        #Get function word count
+        fc1 = len(removeStopWord(h1))
+        fc2 = len(removeStopWord(h2))
+        fVec[14] = fc1
+        fVec[14+feaNum] = fc2
 
-    for h1, h2, ref in islice(sentences(), opts.num_sentences):
-        # Compute blue score for h1 and h2, pick the higher blue score
-        # ref = removeStopWord(ref)
-        p1, p2 = computeBlue(h1,h2,ref)
+        #Content count
+        fVec[15] = len(h1) - fc1
+        fVec[15+feaNum] = len(h2) - fc2
 
-        print(1 if p1 > p2 else # \begin{cases}
-            (0 if p1 == p2
-            else -1)) # \end{cases}
+        return fVec
     
+	# Collect feature vectors
+    lf = open("data/dev.answers")
+    for h1, h2, ref in islice(sentences(), opts.num_sentences):
+        label = lf.readline().strip()
+        if label is not None and label != "":
+            fv = collectFeature(h1, h2, ref)
+            featureVec.append(fv)
+            predVec.append(fv)
+            labelVec.append(int(label.strip()))
+        else:
+            predVec.append(collectFeature(h1, h2, ref))
+
+    fV = np.array(featureVec)
+    pV = np.array(predVec)
+    lV = np.array(labelVec, dtype=int).reshape(-1,1)
+    # Add 1 to 1,2,3
+    lV += 1
+    #Train SVM using scikit-learn
+    Z = OneVsRestClassifier(SVC(kernel="rbf")).fit(fV, lV)
+    Z = Z.predict(pV)
+
+    for x in range(len(Z)):
+        print int(Z[x] -1)
 
 # convention to allow import of this file as a module
 if __name__ == '__main__':
