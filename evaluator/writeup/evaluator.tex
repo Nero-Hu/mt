@@ -1,0 +1,202 @@
+\documentclass[11pt]{article}
+
+\usepackage{graphicx}
+\usepackage{wrapfig}
+\usepackage{url}
+\usepackage{wrapfig}
+\usepackage{color}
+\usepackage{marvosym}
+\usepackage{enumerate}
+\usepackage{subfigure}
+\usepackage{tikz}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{hyperref}
+\usepackage{CJKutf8}
+\usepackage{listings}
+\usepackage[encapsulated]{CJK}
+% set the default code style
+\lstset{
+    frame=tb, % draw a frame at the top and bottom of the code block
+    tabsize=2
+}
+
+\oddsidemargin 0mm
+\evensidemargin 5mm
+\topmargin -20mm
+\textheight 240mm
+\textwidth 160mm
+
+\newcommand{\vw}{{\bf w}}
+\newcommand{\vx}{{\bf x}}
+\newcommand{\vy}{{\bf y}}
+\newcommand{\vxi}{{\bf x}_i}
+\newcommand{\yi}{y_i}
+\newcommand{\vxj}{{\bf x}_j}
+\newcommand{\vxn}{{\bf x}_n}
+\newcommand{\yj}{y_j}
+\newcommand{\ai}{\alpha_i}
+\newcommand{\aj}{\alpha_j}
+\newcommand{\X}{{\bf X}}
+\newcommand{\Y}{{\bf Y}}
+\newcommand{\vz}{{\bf z}}
+\newcommand{\msigma}{{\bf \Sigma}}
+\newcommand{\vmu}{{\bf \mu}}
+\newcommand{\vmuk}{{\bf \mu}_k}
+\newcommand{\msigmak}{{\bf \Sigma}_k}
+\newcommand{\vmuj}{{\bf \mu}_j}
+\newcommand{\msigmaj}{{\bf \Sigma}_j}
+\newcommand{\pij}{\pi_j}
+\newcommand{\pik}{\pi_k}
+\newcommand{\D}{\mathcal{D}}
+\newcommand{\el}{\mathcal{L}}
+\newcommand{\N}{\mathcal{N}}
+\newcommand{\vxij}{{\bf x}_{ij}}
+\newcommand{\vt}{{\bf t}}
+\newcommand{\yh}{\hat{y}}
+\newcommand{\code}[1]{{\footnotesize \tt #1}}
+\newcommand{\alphai}{\alpha_i}
+
+\pagestyle{myheadings}
+\markboth{Haitang Hu}{Machine Translation : Homework 3}
+
+
+\title{Machine Translation\\Evaluator}
+\author{Haitang Hu \\
+  {\tt hthu@cs.jhu.edu}}
+\date{\today}
+
+\begin{document}
+\large
+\maketitle
+\thispagestyle{headings}
+\section{Evaluator Methods} % (fold)
+\label{sec:evaluator_methods}
+\subsection{BLEU and Smoothing} % (fold)
+\label{sub:bleu_and_smoothing}
+\textbf{BLEU} score\cite{bleu} can be simply modified to fit on the sentence level, here we just consider the score within a line of samples, which contains 2 candidate and 1 reference sentence. We employed the \textit{Modified Count} from the original paper, which ensure that the max n-gram count would not exceed the maximum n-gram counts in the reference sentence. But pure \textbf{BLEU} score performs badly, since for those sentences that has no n-gram, their score will simply be 0. Naturally, we could try to smooth our \textbf{BLEU} score, lots of paper have explore the possible options on smoothing technology, here are some of them:
+\begin{enumerate}
+	\item \textbf{BLEU+1}\cite{sbleu}\\
+	The idea is simple. Suppose we have our original modified counts as $c_m$, and candidate n-gram length to be $l_m$, our original BLEU score will be
+	$$ score = \frac{c_m}{l_m}$$
+	while the smoothing version is simply 
+	$$ score = \frac{c_m+s}{l_m+s}$$
+	If we set $s=1$, then we are using standard \textbf{BLEU+1}. Actually, the $s$ here could be set empirically to be the ``count'' that give us best score on our dev data set.
+	\item \textbf{Exponential Invert Smooth}\cite{sybleu}\\
+	This technique is used in NIST official \textbf{BLEU} toolkit. The intuition is giving less weight for a sentence if it has more $0$ match.
+	\item \textbf{Average n-gram}\cite{sybleu}\\
+	This technique tries to average \textbf{BLEU} with adjacent n-gram matching.
+\end{enumerate}
+Except the last technique, all smoothing techniques are implemented in this homework, but none of them gives the best score. Performance will be discussed in \textit{Optimization and Evaluation} section.
+% subsection bleu_and_smoothing (end)
+
+\subsection{String Kernel} % (fold)
+\label{sub:string_kernel}
+String kernel\cite{ssk} ignores our domains knowledge on the word field, instead, it treat sentences to be simply a sequence of strings. So, we could measure our sentence level similarity by looking at their common string subsequences. Notice that this kernel could be very slow, the author proposed a recursive algorithm to solve this problem linearly in the length of two sentence. Even a lot of works have been done on this recursive algorithm implementation, it is still too slow(Possibly takes 12 hours or more to train).
+% subsection string_kernel (end)
+
+\subsection{SVM Classifier} % (fold)
+\label{sub:svm_classifier}
+A classifier\cite{svm} based on SVM gives the best score among all the implementations.\\
+The idea of this classifier is to take sentence evaluation related features, and train them on supervised data set with SVM classifier to get the optimal weights. The features construction follows the paper, with a little modification. Here we don't use the puncation counts, also, for convenience, we ignored the \textbf{POS} part.
+Since we are using SVM, the kernel method is worth discussing. Here, we just simply pick \textbf{RBF Kernel} because it gives the best efficiency on training.
+A \textbf{RBF Kernel} is a method that measures the similarity on a high dimension space via computing \textit{squared Euclidean distance}. The last thing worth mentioning is class numbers. In this case, we are dealing with 3 classes ($\{-1,0,1\}$) of possible outputs, so we can't simply train our data by applying a binary classifier. A ``One-vs-ALL'' classifier has been employed to deal with the multiple classes.\\
+To conclude, the following contains the complete process of training a classifier:
+\begin{enumerate}
+	\item Construct training candidate/reference sentence pair, and their corresponding labels.
+	\item Read through sentence pairs, compress all candidate/reference features into a long vector for each instance.
+	\item Concat the vectors to be a large feature matrix.
+	\item Train data using SVM classifier.
+	\item Contruct features for unlabelled data, and predict using trained weights.
+\end{enumerate}
+% subsection svm_classifier (end)
+\textbf{Note: The SVM training part used scikit-learn}\cite{scilearn}.
+% section evaluator_methods (end)
+
+\section{Optimization} % (fold)
+\subsection{Pre-processing} % (fold)
+\label{sub:stemmer_and_wordnet}
+\begin{enumerate}
+	\item \textbf{Stop Words}\\
+	Stop words should be filtered out before we start work on our language tokens. A typical list of English stop-words have been used in this homework.
+	\item \textbf{Stemmer}\\
+	Word stemmer is a basic technique on word pre-processing, which gives us a suffix-stripped word, that could be used to do n-gram matching. Though this offers higher probabilities on matching, but it loses imformation on morphology, and verb tense. A standard \textbf{porter stemmer}\cite{porter} has been implemented, but the experiment shows pure stemming gives worse performance.
+\end{enumerate}
+
+% subsection stemmer_and_wordnet (end)
+\subsection{Variant Weight \textbf{BLEU}} % (fold)
+\label{sub:variant_weight_bleu}
+Traditional \textbf{BLEU} uses equal weight for all n-grams matching. But we could encode our belief on this weight to optimize it. For example, we could assign more weight on 4-gram, since it is rare and if one matches that then we have more reason to believe it having higher score. In this homework, the experiments shows that a reverse weights has better performance(give unigram more weights and etc.).
+% subsection variant_weight_bleu (end)
+
+\subsection{SVM Tuning} % (fold)
+\label{sub:svm_tuning}
+Linear SVC is actually the first choice of this task, but it failed to train. So the more efficient \textbf{RBF} is used. Also, since \textbf{RBF} is also measuring similarity, so it is more likely to have positive effect.\\
+% subsection svm_tuning (end)
+% section evaluation (end)
+
+\section{Experiments} % (fold)
+\label{sec:evaluation}
+\subsection{Results} % (fold)
+\label{sub:results}
+
+% subsection results (end)
+The experiments results are shown in table below:
+\begin{table}[!htf]
+\centering
+\begin{tabular}{ | c | c |}
+\hline
+Method & Score\\
+\hline
+Simple Meteor & $0.500900$\\
+\hline
+Pure BLEU & $0.340312$ \\
+\hline
+BLEU+0.1 & $0.506844$ \\
+\hline
+BLEU+1 & $0.507431$ \\
+\hline
+BLEU+1 2-gram& $0.519321$ \\
+\hline
+BLEU+1 2-gram + sw& $0.516857$ \\
+\hline
+BLEU+1 4-gram& $0.511499$ \\
+\hline
+BLEU+1 2-gram + stm + stp & $0.496284$ \\
+\hline
+BLEU+1 4-gram + stm + stp & $0.488853$ \\
+\hline
+SVM with RBF & $\bf{0.560075}$\\
+\hline
+\end{tabular}
+\caption{Scores for different methods}
+Note: \textit{stm}: stemmer, \textit{stp}: remove stop words and punctuation\\
+\textit{sw} : same weight BLEU
+\end{table}
+
+\subsection{Evaluation} % (fold)
+\label{sub:evaluation}
+Note that we actually get worse performance when we drop stop words, punctuation and use stemmer, that could simply because when we dropped these terms we also dropped useful information such as morphology, verb tense, etc.\\
+Also, when comparing the results, we also found that for SVM classifier, we got very less $0$ predictions, which could be caused by less training data. A simple way to deal with this is to manully duplicate the $0$ training to data, so that we get more ``space'' for this class in our ``plane'', but we didn't try it out for time limitation.
+% subsection evaluation (end)
+
+% section evaluation (end)
+
+
+\begin{thebibliography}{50}
+\bibitem{svm} Xingyi Song and Trevor Cohn. \textsl{Regression and Ranking based Optimisation for Sentence Level Machine Translation Evaluation}, 2011.
+
+\bibitem{bleu} Kishore Papineni, Salim Roukos, Todd Ward and Wei-Jing Zhu. \textsl{BLEU: a Method for Automatic Evaluation of Machine Translation}, 2002.
+
+\bibitem{sbleu} Chin-Yew Lin and Franz Josef Och. \textsl{Automatic Evaluation of Machine Translation Quality Using Longest Common Subsequence and Skip-Bigram Statistics}, 2004.
+
+\bibitem{sybleu} Boxing Chen and Colin Cherry. \textsl{A Systematic Comparison of Smoothing Techniques for Sentence-Level BLEU}, 2014.
+
+\bibitem{porter} M.F.Porter. \textsl{An algorithm for suffix stripping}, 1980.
+
+\bibitem{ssk} Huma Lodhi, Craig Saunders, John Shawe-Taylor, Nello Cristianini and Chris Watkins. \textsl{Text Classification using String Kernels}, 2002.
+
+\bibitem{scilearn} \textsl{Scikit-Learn}, 2015. \url{http://scikit-learn.org}
+
+\end{thebibliography}
+\end{document}
