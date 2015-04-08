@@ -55,9 +55,9 @@ def main():
 			# Compute bleu_stat for each hypothesis
 			h_stat.append(bleu_stat(hyp, opts.ngram))
 			# Compute posterior using the product of language mode, tranlation model and lexical model
-			pos = 1.0
+			pos = 0.0
 			for feat in feats.split(' '):
-				pos *= float(feat.split('=')[1])
+				pos += float(feat.split('=')[1])
 			posterior[n] = pos
 			sumPos += pos
 			# Summing loss for corresponding entry
