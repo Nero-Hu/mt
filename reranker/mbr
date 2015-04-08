@@ -58,7 +58,7 @@ def main():
 			pos = 0.0
 			for feat in feats.split(' '):
 				pos += float(feat.split('=')[1])
-			posterior[n] = pos
+			posterior[n] = pos + 0.5 * len(hyp.split())
 			sumPos += pos
 			# Summing loss for corresponding entry
 			for (j, h) in enumerate(h_stat):
