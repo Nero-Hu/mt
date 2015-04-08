@@ -1,3 +1,11 @@
+###Minimum Bayes Risk Rerank
+Simply run the ``mbr`` scripts will analyze on the `dev+test.100best` data, using sentence level bleu score loss function. 
+$$ \mathcal{L} = 1 - bleu(candidate, reference)$$ 
+
+Here we try to select the most `similar` sentence among all candidates.
+
+###Below from JHU MT Class
+
 There are three Python programs here (`-h` for usage):
 
  - `./rerank` chooses the best candidate translations from a k-best list using a linear model.
