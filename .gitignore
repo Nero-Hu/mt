@@ -66,3 +66,5 @@ alignment/writeup/alignment.blg
 *.bbl
 
 *.blg
+
+*.fdb_latexmk

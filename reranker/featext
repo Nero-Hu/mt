@@ -1,0 +1,56 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import sys
+import optparse
+import bleu
+import math
+import numpy as np
+from collections import Counter
+
+def isNonEnglish(s):
+	try:
+		s.decode('ascii')
+	except UnicodeDecodeError:
+	    return 1.0
+	else:
+	    return 0.0
+
+def main():
+	optparser = optparse.OptionParser()
+	optparser.add_option("-k", "--kbest-list", dest="input", default="data/dev+test.100best", help="100-best translation lists")
+	optparser.add_option("-r", "--ref-list", dest="ref", default="data/dev.ref", help="reference for sentences")
+	optparser.add_option("-l", "--lm", dest="lm", default=-1.0, type="float", help="Language model weight")
+	optparser.add_option("-t", "--tm1", dest="tm1", default=-0.7, type="float", help="Translation model p(e|f) weight")
+	optparser.add_option("-s", "--tm2", dest="tm2", default=-0.35, type="float", help="Lexical translation model p_lex(f|e) weight")
+	optparser.add_option("-c", "--cweight", dest="cweight", default=1.03, help="Word count penalization")
+	optparser.add_option("-u", "--uweight", dest="uweight", default=0.1, help="Untranslated words penalization")
+
+	(opts, _) = optparser.parse_args()
+
+	weights = [opts.lm, opts.tm1, opts.tm2]
+
+	all_hyps = [pair.split(' ||| ') for pair in open(opts.input)]
+	# all_ref = [r for r in open(opts.ref)]
+	num_sents = len(all_hyps) / 100
+	for s in xrange(0, num_sents):
+		hyps_for_one_sent = all_hyps[s * 100:s * 100 + 100]
+		# r_st = bleu_stat(all_ref[s], opts.ngram)
+		(best_score, best) = (-1e300, '')
+		for (n, (num, hyp, feats)) in enumerate(hyps_for_one_sent):
+			score = 0.0
+			wIdx = 0
+			for feat in feats.split(' '):
+				(k, v) = feat.split('=')
+				score += weights[wIdx] * float(v)
+				wIdx += 1
+			# Add word counts difference
+			sen = hyp.split()
+			score += opts.cweight * len(sen)
+			score += opts.uweight * sum([isNonEnglish(w) for w in sen])
+			if score > best_score:
+				(best_score, best) = (score, hyp)
+		print best
+
+if __name__ == '__main__':
+	main()
