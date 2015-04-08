@@ -1,9 +1,15 @@
-###Minimum Bayes Risk Rerank
+###Rerank
+####Minimum Bayes Risk 
 Simply run the ``mbr`` scripts will analyze on the `dev+test.100best` data, using sentence level bleu score loss function.
 
 	L = 1 - bleu(candidate, reference)
 
 Here we try to select the most `similar` sentence among all candidates.
+
+####Simple feature extension
+Now we take `untranslated Russian words` and `word counts` into consideration, by penalizing them using some weights. The program can be called as below:
+
+	./featext
 
 ###Below from JHU MT Class
 
