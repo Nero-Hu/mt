@@ -28,7 +28,7 @@ def bleu_score(c_stat, r_stat, ngram):
 	for i in xrange(1, ngram+1):
 		c = max([sum((c_stat[i] & r_stat[i]).values()), 0])
 		if c != 0:
-			log_prec += math.log(float(c) / float(max(lc -i + 1,0)))
+			log_prec += math.log((float(c) + 1.0) / float(max(lc -i + 2.0,1.0)))
 	return math.exp(brev + log_prec/4.0)
 
 
@@ -62,6 +62,7 @@ def main():
 			sumPos += pos
 			# Summing loss for corresponding entry
 			for (j, h) in enumerate(h_stat):
+				# Diagonal 
 				loss[j] += 1.0 - bleu_score(h, h_stat[n], opts.ngram)
 				loss[n] += 1.0 - bleu_score(h_stat[n], h, opts.ngram)
 
