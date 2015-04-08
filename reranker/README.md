@@ -1,6 +1,7 @@
 ###Minimum Bayes Risk Rerank
-Simply run the ``mbr`` scripts will analyze on the `dev+test.100best` data, using sentence level bleu score loss function. 
-$$ \mathcal{L} = 1 - bleu(candidate, reference)$$ 
+Simply run the ``mbr`` scripts will analyze on the `dev+test.100best` data, using sentence level bleu score loss function.
+
+	L = 1 - bleu(candidate, reference)
 
 Here we try to select the most `similar` sentence among all candidates.
 
