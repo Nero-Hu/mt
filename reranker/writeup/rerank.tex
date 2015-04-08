@@ -1,0 +1,156 @@
+\documentclass[11pt]{article}
+
+\usepackage{graphicx}
+\usepackage{wrapfig}
+\usepackage{url}
+\usepackage{wrapfig}
+\usepackage{color}
+\usepackage{marvosym}
+\usepackage{enumerate}
+\usepackage{subfigure}
+\usepackage{tikz}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{hyperref}
+\usepackage{CJKutf8}
+\usepackage{listings}
+\usepackage[encapsulated]{CJK}
+% set the default code style
+\lstset{
+    frame=tb, % draw a frame at the top and bottom of the code block
+    tabsize=2
+}
+
+\oddsidemargin 0mm
+\evensidemargin 5mm
+\topmargin -20mm
+\textheight 240mm
+\textwidth 160mm
+
+\newcommand{\vw}{{\bf w}}
+\newcommand{\vx}{{\bf x}}
+\newcommand{\vy}{{\bf y}}
+\newcommand{\vxi}{{\bf x}_i}
+\newcommand{\yi}{y_i}
+\newcommand{\vxj}{{\bf x}_j}
+\newcommand{\vxn}{{\bf x}_n}
+\newcommand{\yj}{y_j}
+\newcommand{\ai}{\alpha_i}
+\newcommand{\aj}{\alpha_j}
+\newcommand{\X}{{\bf X}}
+\newcommand{\Y}{{\bf Y}}
+\newcommand{\vz}{{\bf z}}
+\newcommand{\msigma}{{\bf \Sigma}}
+\newcommand{\vmu}{{\bf \mu}}
+\newcommand{\vmuk}{{\bf \mu}_k}
+\newcommand{\msigmak}{{\bf \Sigma}_k}
+\newcommand{\vmuj}{{\bf \mu}_j}
+\newcommand{\msigmaj}{{\bf \Sigma}_j}
+\newcommand{\pij}{\pi_j}
+\newcommand{\pik}{\pi_k}
+\newcommand{\D}{\mathcal{D}}
+\newcommand{\el}{\mathcal{L}}
+\newcommand{\N}{\mathcal{N}}
+\newcommand{\vxij}{{\bf x}_{ij}}
+\newcommand{\vt}{{\bf t}}
+\newcommand{\yh}{\hat{y}}
+\newcommand{\code}[1]{{\footnotesize \tt #1}}
+\newcommand{\alphai}{\alpha_i}
+
+\pagestyle{myheadings}
+\markboth{Haitang Hu}{Machine Translation : Homework 4}
+
+
+\title{Machine Translation\\Rerank}
+\author{Haitang Hu \\
+  {\tt hthu@cs.jhu.edu}}
+\date{\today}
+
+\begin{document}
+\large
+\maketitle
+\thispagestyle{headings}
+\section{Rerank Methods} % (fold)
+\label{sec:rerank_methods}
+\subsection{Minimum Bayes-Risk Decoding} % (fold)
+\label{sub:minimum_bayes_risk_decoding}
+Minimum Bayes-Risk Decoding\cite{mbr} aims to minimize the expected loss of translation errors. By applying specific metrics(\textbf{BLEU}, \textbf{WER}) as loss function, we could form our MBR decoder to improve reranking performance on Machine Translation System.\\
+The minimum Bayes-Risk can be expressed in terms of \textit{loss function} and our decoder generated results $\delta(F)$.
+$$ R(\delta(F)) = E_{P(E,A,F)}[L((E,A),\delta(F))]$$
+Where the expectation is taken under the distribution of $P(E,A,F)$, which means the true joint distribution.\\
+For this problem, we have a well known solution if given the loss function and a distribution
+$$ \delta(F) = \text{arg min}_{E^{\prime}, A^{\prime}} \sum_{E,A}L((E,A),(E^{\prime}, A^{\prime}))P(E,A|F) $$
+where $E$ is the translation sentence, $A$ is a alignment under the translation $(E,F)$. But this ideal model is far from reality, since we don't have the true distribution for our $P(E,A|F)$. Here, we compromise to our statiscal methods, to guess the distribution through $N-best$ list we have, and now the model becomes
+$$ \hat{i} = \text{arg min}_{i \in \{1,2,\dots, N\}} \sum_{j=1}^N L((E_j,A_j), (E_i,A_i))P(E_j,A_j|F)$$
+where $P(E_j,A_j|F)$ can be represented as 
+$$ P(E_j,A_j|F) = \frac{P(E_j,A_j,F)}{\sum_j^NP(E_j,A_j,F)}$$
+Note that $P(E_j,A_j,F)$ now is just a empirical distribution under given $N-best$ list.\\
+This model suggests that we should look into all our $N-best$ list, and select the \textit{average} one as our results, since the \textit{average} one always gives us less surprise, or \textit{risk}.\\
+Also, it might be worth citing the paper's proof, that if we use a indicator function on our loss function, then MBR reduced to the MAP estimator.
+$$ \delta_{MAP}(F) = \text{arg max}_{(E^{\prime}, A^{\prime})}P(E^{\prime}, A^{\prime}|F)$$
+This is intuitive, since MAP just use point estimate which assumes all our distribution density peaks at the point. Instead, MBR gives a more smoothed distribution.
+% subsection minimum_bayes_risk_decoding (end)
+
+\subsection{Feature Extension} % (fold)
+\label{sub:feature_extension}
+It is natural that we should not only depends on our translation model, language model and lexical model score. Here we encode another 2 belief into our features, to get a better representation of our domain knowledge. First, we consider the word counts, an intuitive way to encode our belief is to penalize with respect to the difference of length $\delta(c, r)$ between candidate and reference. The second feature is simply the number of untranslated Russian words, notated as $u(c)$. So, we have our model score to be following
+$$ s(c) = \lambda_{l(c)}l(c) + \lambda_{t(c)}t(c) + \lambda_{lex(c)}lex(c) - \lambda_{\delta(c, r)}\delta(c, r) - \lambda_{u(c)}u(c)$$
+Here we have 5 parameters, and we should choose them to fit best to our training data.
+% subsection feature_extension (end)
+% section rerank_methods (end)
+
+\section{Implementation} % (fold)
+\label{sec:implementation}
+\subsection{Metric} % (fold)
+\label{sub:metric}
+Generally, \textbf{BLEU} will be used as our loss function. Since \textbf{BLEU} score always lies in the range of $(0,1)$, so we could encode our loss function to be
+$$ L((E_j,A_j), (E_i,A_i)) = 1 - BLEU((E_j,A_j), (E_i,A_i))$$
+Recall, we also need to specify our posterior distribution. Here we specify it to be
+$$ P(E_j,A_j|F) = \log(l(E_j)) +  \log(t(E_j|F)) + \log(lex(E_j,A_j|F))$$
+Also, there is another point worth mentioning, that is the \textbf{BLEU} can both applied on \textit{string level} and \textit{word level}. We will show the performance comparison later.
+% subsection metric (end)
+\subsection{Efficiency} % (fold)
+\label{sub:efficiency}
+Since for each $N-best$ list, we need to at least loop $N^2$ times, since we have a pairwise loss, so it is neccesary to implement it in a smarter way. Here we employ a matrix method to avoid to loop twice for computing normalize constant and pariwise loss.
+% subsection efficiency (end)
+% section implementation (end)
+
+\section{Evaluation} % (fold)
+\label{sec:evaluation}
+\subsection{Result} % (fold)
+\label{sub:result}
+\begin{table}[!htf]
+\centering
+\begin{tabular}{ | c | c |}
+\hline
+Method & Score\\
+\hline
+baseline & $0.2735$\\
+\hline
+baseline($lm = -1.0, tm = -0.65, lex = -1.3$) & $0.2817$ \\
+\hline
+feature ext($lm = -1.0, tm = -0.65, lex = -1.3, c = 1.03, u = 0.1$) & $0.2893$ \\
+\hline
+MBR & $0.2916$ \\
+\hline
+MBR + word count & $\bf{0.2918}$ \\
+\hline
+\end{tabular}
+\caption{Result}
+$c, u$ stands for word count weight and untranslated words weight 
+\end{table}
+% subsection result (end)
+% section evaluation (end)
+
+\subsection{Evaluation and Optimization} % (fold)
+\label{sub:evaluation_Optimization}
+As we can see here, simply tuning the parameter of \textit{baseline} system gives us a big improvement, which shows the huge gain we could get from \textit{MERT} or \textit{PRO}(But I did not encode them).\\
+Next, we look at he feature extension, which again raise a lot score, since we actually encode the significant reason to express our belief, which happens to be right.\\
+We gain the best score by using MBR method with counting \textit{word count} feature into our posterior distribution, this shows the we could benifit from more feature under MBR setting. Also, since 
+% subsection evaluation (end)
+
+\begin{thebibliography}{50}
+\bibitem{mbr} Shankar Kumar and William Byrne. \textsl{Minimum Bayes-Risk Decoding for Statistical Machine Translation}, 2011.
+
+\end{thebibliography}
+\end{document}
