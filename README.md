@@ -7,9 +7,11 @@ The repository contains following:
 - [Evaluator][3]
 - [Standard Porter Stemmer][4]
 - [Rerank][5]
+- [Inflection][6]
 
 [1]:https://github.com/Nero-Hu/mt/tree/master/alignment/fast_align
 [2]:https://github.com/Nero-Hu/mt/tree/master/decoder
 [3]:https://github.com/Nero-Hu/mt/tree/master/evaluator
 [4]:https://github.com/Nero-Hu/mt/tree/master/stemmer
 [5]:https://github.com/Nero-Hu/mt/tree/master/reranker
+[6]:https://github.com/Nero-Hu/mt/tree/master/inflect
