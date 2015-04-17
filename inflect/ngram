@@ -33,17 +33,16 @@ def backoffLM(lemmaStats, lemma):
     return sorted(lemmaStats[len(lemma)-1][tuple(lemma)].iteritems(), key=lambda (k,v): v,reverse=True)[0][0]
 
 def main():
-    PARSER = argparse.ArgumentParser(description="Inflect a lemmatized corpus with bigram model")
+    PARSER = argparse.ArgumentParser(description="Inflect a lemmatized corpus with n-gram model")
     PARSER.add_argument("-t", type=str, default="data/train", help="training data prefix")
     PARSER.add_argument("-l", type=str, default="lemma", help="lemma file suffix")
     PARSER.add_argument("-w", type=str, default="form", help="word file suffix")
-    PARSER.add_argument("-n", type=int, default=2, help="n-gram model")
+    PARSER.add_argument("-n", type=int, default=2, help="n-gram model(default 2 to be bigram)")
     PARSER.add_argument("-d", type=str, default="data/dtest", help="test file")
     args = PARSER.parse_args()
 
     # Python sucks at UTF-8
     sys.stdout = codecs.getwriter('utf-8')(sys.stdout) 
-    sys.stdin = codecs.getreader('utf-8')(sys.stdin)
 
     lemmaStats = gramStats(args.t + "." + args.w, args.t + "." + args.l, args.n)
 
