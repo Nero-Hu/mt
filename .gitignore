@@ -68,3 +68,6 @@ alignment/writeup/alignment.blg
 *.blg
 
 *.fdb_latexmk
+
+inflect/data/
+inflect/scripts/
