@@ -20,7 +20,6 @@ def gramStats(formFile, lemmaFile, posFile, ngram):
         lemmas = lemmas.rstrip().lower().split()
         tags = tags.split()
         # Collect stats for n-grams joint with pos
-        # Collect stats for n-grams
         for i in xrange(1, ngram + 1):
             for n in range(len(lemmas) + 1 - i):
                 lemmaStats[i-1][tuple(lemmas[n:n+i])][tuple(tags[n:n+i])][tuple(words[n:n+i])] += 1
