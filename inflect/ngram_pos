@@ -10,52 +10,60 @@ from itertools import izip
 def utf8read(f):
     return codecs.open(f, 'r', 'utf-8')
 
-def gramStats(formFile, lemmaFile, posFile, ngram):
-    # List of dictionaries that contains the stats for ngram mapping
-    lemmaStats = [defaultdict(lambda : defaultdict(lambda : defaultdict(float)))] * ngram
+class Ngram_pos:
+    """
+    ngram model with pos tags
+    """
+    def __init__(self, formFile, lemmaFile, posFile, ngram):
+        self.gramStats(formFile, lemmaFile, posFile, ngram)
     
-    for words, lemmas, tags in izip(utf8read(formFile),utf8read(lemmaFile), utf8read(posFile)):
-        # Collect bigram with based on lemma
-        words = words.rstrip().lower().split()
-        lemmas = lemmas.rstrip().lower().split()
-        tags = tags.split()
-        # Collect stats for n-grams joint with pos
-        for i in xrange(1, ngram + 1):
-            for n in range(len(lemmas) + 1 - i):
-                lemmaStats[i-1][tuple(lemmas[n:n+i])][tuple(tags[n:n+i])][tuple(words[n:n+i])] += 1
+    def gramStats(self, formFile, lemmaFile, posFile, ngram):
+        # List of dictionaries that contains the stats for ngram mapping
+        self.lemmaStats = [defaultdict(lambda : defaultdict(lambda : defaultdict(float)))] * ngram
+        
+        for words, lemmas, tags in izip(utf8read(formFile),utf8read(lemmaFile), utf8read(posFile)):
+            # Collect bigram with based on lemma
+            words = words.rstrip().lower().split()
+            lemmas = lemmas.rstrip().lower().split()
+            tags = tags.split()
+            # Collect stats for n-grams joint with pos
+            for i in xrange(1, ngram + 1):
+                for n in range(len(lemmas) + 1 - i):
+                    self.lemmaStats[i-1][tuple(lemmas[n:n+i])][tuple(tags[n:n+i])][tuple(words[n:n+i])] += 1
 
-    return lemmaStats
+        return self.lemmaStats
 
-def getUnigram(posDict):
-    """
-    return dict with key to be the words, by summming up all possible pos
-    """
-    (max_count, best_unigram) = (0,0)
-    unigramDict = defaultdict(float)
-    for posTag, wordDict in posDict.iteritems():
-        for word, counts in wordDict.iteritems():
-            unigramDict[word] += counts
-            if unigramDict[word] > max_count:
-                max_count = unigramDict[word]
-                best_unigram = word
+    def getUnigram(self, posDict):
+        """
+        return dict with key to be the words, by summming up all possible pos
+        """
+        (max_count, best_unigram) = (0,0)
+        unigramDict = defaultdict(float)
+        for posTag, wordDict in posDict.iteritems():
+            for word, counts in wordDict.iteritems():
+                unigramDict[word] += counts
+                if unigramDict[word] > max_count:
+                    max_count = unigramDict[word]
+                    best_unigram = word
 
-    return best_unigram
+        return best_unigram
 
-def backoffLM(lemmaStats, lemma, tags):
-    # See if ngram exists, if not backoff to n-1 gram
-    if tuple(lemma) not in lemmaStats[len(lemma)-1]:
-        if len(lemma) == 1:
-            return lemma
-        return backoffLM(lemmaStats, lemma[0:len(lemma)-1], tags[0:len(tags)-1])
-    elif tuple(tags) not in lemmaStats[len(lemma)-1][tuple(lemma)]:
-        if len(lemma) == 1:
-            #return largest unigram prob
-            return getUnigram(lemmaStats[len(lemma)-1][tuple(lemma)])
-        else:
-            return backoffLM(lemmaStats, lemma[0:len(lemma)-1], tags[0:len(tags)-1])
-    # goes here just return the largest
-    return sorted(lemmaStats[len(lemma)-1][tuple(lemma)][tuple(tags)].iteritems(),\
-     key=lambda (k,v): v,reverse=True)[0][0]
+    def backoffLM(self, lemma, tags):
+        # See if ngram exists, if not backoff to n-1 gram
+        if tuple(lemma) not in self.lemmaStats[len(lemma)-1]:
+            if len(lemma) == 1:
+                return lemma
+            return self.backoffLM(lemma[0:len(lemma)-1], tags[0:len(tags)-1])
+        elif tuple(tags) not in self.lemmaStats[len(lemma)-1][tuple(lemma)]:
+            if len(lemma) == 1:
+                #return largest unigram prob
+                return self.getUnigram(self.lemmaStats[len(lemma)-1][tuple(lemma)])
+            else:
+                return self.backoffLM(lemma[0:len(lemma)-1], tags[0:len(tags)-1])
+        # goes here just return the largest
+        return sorted(self.lemmaStats[len(lemma)-1][tuple(lemma)][tuple(tags)].iteritems(),\
+         key=lambda (k,v): v,reverse=True)[0][0]
+            
 
 def main():
     PARSER = argparse.ArgumentParser(description="Inflect a lemmatized corpus with n-gram model")
@@ -69,7 +77,7 @@ def main():
     # Python sucks at UTF-8
     sys.stdout = codecs.getwriter('utf-8')(sys.stdout) 
 
-    lemmaStats = gramStats(args.t + "." + args.w, args.t + "." + args.l, args.t + ".tag", args.n)
+    ng_pos = Ngram_pos(args.t + "." + args.w, args.t + "." + args.l, args.t + ".tag", args.n)
 
     for lemmas, tags in izip(utf8read(args.d + "." + args.l), utf8read(args.d + ".tag")):
         lemmas = lemmas.rstrip().lower().split()
@@ -77,7 +85,7 @@ def main():
         sen = ""
         i = 0
         while i < len(lemmas):
-            lem = backoffLM(lemmaStats, lemmas[i:min(i+args.n, len(lemmas))], tags[i:min(i+args.n, len(tags))])
+            lem = ng_pos.backoffLM(lemmas[i:min(i+args.n, len(lemmas))], tags[i:min(i+args.n, len(tags))])
             i += len(lem)
             for le in lem:
                 sen += le + " "
