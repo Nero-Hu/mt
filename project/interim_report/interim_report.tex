@@ -1,0 +1,159 @@
+% !TeX encoding = UTF-8
+%
+% File naaclhlt2010.tex
+%
+% Contact: nasmith@cs.cmu.edu
+
+\documentclass[11pt,letterpaper]{article}
+\usepackage{naaclhlt2010}
+\usepackage{times}
+\usepackage{latexsym}
+\usepackage{url}
+\usepackage{CJKutf8}
+\usepackage{graphicx}
+\usepackage[encapsulated]{CJK}
+\usepackage{listings}
+\usepackage{amsmath}
+
+% set the default code style
+\lstset{
+    frame=tb, % draw a frame at the top and bottom of the code block
+    tabsize=2,
+    breaklines=true, breakatwhitespace=true % auto line break
+}
+
+\setlength\titlebox{6.5cm}    % Expanding the titlebox
+
+\title{Extend Reordering for Moses\\Interim Report}
+
+\author{Haitang Hu\\
+  {\tt hthu@cs.jhu.edu}}
+
+\date{\today}
+
+\begin{document}
+\maketitle
+\begin{abstract}
+The goal of this project is to extend the reordering model of Moses\cite{moses:2007}. Currently Moses encodes simple linear distortion model\cite{spt:2003} and lexical reordering model. As paper from Spence Green\cite{dc:2010} indicated, there exists two problems with these models: Failing to estimate future costs, and penalizing all distortion linearly. The extended reordering model will be built on the base of incorporate future costs, and sentence level features based discriminative classifier.
+\end{abstract}
+
+\section{Problem Definition} % (fold)
+\label{sec:problem_definition}
+Moses now limits the reordering to be a ``hard'' constraint that eleminates all the possiblities after exceeding this threshold, for example, a simple distance model. The simple model with low limits is likely to fail to captuer ``best'' translation with longer distortion, but even with higher reorder limits, the unpenalized longer distance words could result a drop of BLEU score. Spence Green at al.\cite{dc:2010} proposed a novel distortion model to deal with problem, by considering future costs, and sentence level features based classifier, which could provide a higher distortion limits without affecting performance.
+% section problem_definition (end)
+
+\section{Model} % (fold)
+\label{sec:model}
+A model consists of four components will be discussed in this section.
+\subsection{Future Cost Estimation} % (fold)
+\label{sub:future_cost_estimation}
+Even linear distortion is effective on baseline MT systems, it could cause the balance of low and high distortion limit to be hard. Since low distortion could impose ``hard'' constraint on longer possible options, while high distortion could allow careless skip words without penalization. This is also caused by the underestimation of future cost. To constrain search, a admissible future cost estimate is added to linear model.\\
+Let $C$ denotes the source coverage set, and $j$ denotes the first uncovered index in $C$. Let $C_j$ denotes the subset of $C$ starting from position $j$, and let $j^{\prime}$ denotes the leftmost position in phrase $p$ applied at translation step $k$. The future cost $F_k$ will be defined as following:
+$$ F_k = \begin{cases}
+  |C_j| + (j^{\prime} + |p| + 1 - j) & \text{ if $j^{\prime} > j$ }\\
+  0 & \text{otherwise}
+ \end{cases} $$
+ For $k>0$, difference $\Delta_{cost} = F_k - F_{k-1}$ are add to the linear penalty in distortion function $D(s,t)$, where $s$ denotes the source sentence and $t$ denotes the target translation sentence.
+% subsubsection future_cost_estimation (end)
+\subsection{Discriminative Distortion Model} % (fold)
+\label{sub:discriminative_distortion_model}
+The heuristic future function constrain the distortion given high limits, and now we need a cost model that could predict best distortion given source sentence. A log linear framework are included to accomplish this task. The classifier will classify the words into 9 distortion equivalence classes, given its \textit{features} defined later. As the paper indicates, let $d_{j,j^{\prime}}$ denotes the equivalence class corresponding to a jump from source word $j$ to $j^{\prime}$ computed as $j + 1 - j^{\prime}$.
+\clearpage
+$$ p_{\lambda}(d_{j,j^{\prime}}|f_1^J,j,j^{\prime}) =$$
+$$\frac{exp\{ \sum_{m=1}^M \lambda_mh_m(f_1^J,j,j^{\prime}),d_{j,j^{\prime}}\}}{\sum_{d_{j,j^{\prime}}} \{\sum_{m=1}^M \lambda_mh_m(f_1^J,j,j^{\prime}),d_{j,j^{\prime}}\}}$$
+where $\lambda_m$ is the feature weight for $h_m(f_1^J,j,j^{\prime})$, which is arbitrary feature given current alignment.
+This could be solved by taking a gradient method.\\
+Also, to avoid getting too much weights, a L1 regularization are conducted to produce a sparse weights space.
+The features of the discriminative classifier includes following:
+\begin{itemize}
+	\item Outbound features that enocdes between-phrase distortion.
+	\item Inbound features that encodes in-phrase distortion.
+	\item Part-of-Speech tags
+	\item Equally-divided 5 classes with respect to source sentence position.
+	\item Equally-divided 4 classes with respect to source sentence length. Note that we divides the source sentences into 4 equally distributed classes.
+\end{itemize}
+% subsection discriminative_distortion_model (end)
+% section model (end)
+
+\section{Implementation} % (fold)
+\label{sec:implementation}
+Significant amount of time are used to reading and understanding the inferface of Moses. Development is under processing. The code are desired to be written in C++.
+% section implementation (end)
+
+\section{Experiments} % (fold)
+\label{sec:experiments}
+Experiments are conducted on Moses, using distance distortion with limits $5$ and $15$ as baseline system.
+\subsection{Data set} % (fold)
+\label{sub:data_set}
+Japanese-English Bilingual Corpus of Wikipedia's Kyoto Articles\cite{nict:2012} are used to evaluate the reordering performance. As we know, Japanese is typically a SOV language, where the longer distance reordering are more likely to be eleminated by simple model. The corpus contains more than $500,000$ parallel languages pairs, with $15$ categories of topic. Also, the corpus contains modified histories for each sentence, both in Japanese and English, while in this experiment we are only going to consider the final checked version. \\
+A typical file looks like below:
+\begin{lstlisting}[language=xml, caption={Corpus data structure}]
+<sen id="2">
+<j>Japanese Sentence</j>
+<e type="trans" ver="1">English Translation Version 1.</e>
+<cmt></cmt>
+<e type="trans" ver="2">English Translation Version 2.</e>
+<cmt>Modification comment</cmt>
+<e type="check" ver="1">English Translation Final Version.</e>
+<cmt>Modification comment</cmt>
+</sen>
+\end{lstlisting}
+Note that in the data set, special characters such as ', will be espaced by html fashion of \textit{\&quot;}. In our data pre-processing step, we will consider all of these as there original characters.\\
+Note that the data pre-processing has been done, and the parallel corpus data can be find on my github.\url{https://github.com/Nero-Hu/mt/tree/master/project/data}
+% subsection data_set (end)
+
+\subsection{Metrics} % (fold)
+\label{sub:metrics}
+BLEU and cased BLEU score will be measured to evaluate the performance. Higher BLEU score is better.
+% subsection metrics (end)
+% section experiments (end)
+
+\begin{thebibliography}{}
+
+\bibitem[\protect\citename{Philipp Koehn at al.}2007]{moses:2007}Philipp Koehn, Hieu Hoang, Alexandra Birch, Chris Callison-Burch, Marcello Federico, Nicola Bertoldi, Brooke Cowan, Wade Shen, Christine Moran, Richard Zens, Chris Dyer, Ondrej Bojar, Alexandra Constantin, Evan Herbst.
+\newblock 2007,
+\newblock {\em Moses: Open Source Toolkit for Statistical Machine Translation}.
+
+\bibitem[\protect\citename{Arianna Bisazza and Marcello Federico}2013]{dshape:2013}Arianna Bisazza and Marcello Federico.
+\newblock 2013,
+\newblock {\em Dynamically Shaping the Reordering Search Space of Phrase-Based Statistical Machine Translation}.
+
+\bibitem[\protect\citename{Spence Green at al.}2010]{dc:2010}Spence Green, Michel Galley, and Christopher D. Manning.
+\newblock 2010,
+\newblock {\em Improved Models of Distortion Cost for Statistical Machine Translation}.
+
+\bibitem[\protect\citename{Richard Zens at al.}2004]{rc:2004}Richard Zens, Hermann Ney, Taro Watanabe and Eiichiro Sumita.
+\newblock 2004,
+\newblock {\em IReordering Constraints for Phrase-Based Statistical Machine Translation}.
+
+\bibitem[\protect\citename{Minwei Feng at al.}2013]{ar:2013}Minwei Feng and Jan-Thorsten Peter and Hermann Ney.
+\newblock 2013,
+\newblock {\em Advancements in Reordering Models for Statistical Machine Translation}.
+
+\bibitem[\protect\citename{Dmitriy Genze}2010]{al:2010}Dmitriy Genze.
+\newblock 2010,
+\newblock {\em Automatically Learning Source-side Reordering Rules for Large Scale Machine Translation}.
+
+\bibitem[\protect\citename{John DeNero and Jakob Uszkoreit}2011]{id:2011}John DeNero and Jakob Uszkoreit.
+\newblock 2011,
+\newblock {\em Inducing Sentence Structure from Parallel Corpora for Reordering}.
+
+\bibitem[\protect\citename{Uri Lerner and Slav Petrov}2013]{ss:2013}Uri Lerner and Slav Petrov.
+\newblock 2013,
+\newblock {\em Source-Side Classifier Preordering for Machine Translation}.
+
+\bibitem[\protect\citename{Philipp Koehn}2005]{eu:2005}Philipp Koehn.
+\newblock 2005,
+\newblock {\em Europarl: A Parallel Corpus for Statistical Machine Translation}.
+
+\bibitem[\protect\citename{Philipp Koehn, Franz Josef Och, Daniel Marcu}2003]{spt:2003}Philipp Koehn, Franz Josef Och, Daniel Marcu.
+\newblock 2003,
+\newblock {\em Statistical phrase-based translation}.
+
+\bibitem[\protect\citename{NIICT}2012]{nict:2012}National Institute of Information and Communications Technology.
+\newblock 2012,
+\newblock {\em Japanese-English Bilingual Corpus of Wikipedia's Kyoto Articles}.
+
+\end{thebibliography}
+
+\end{document}
