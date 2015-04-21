@@ -72,3 +72,7 @@ alignment/writeup/alignment.blg
 inflect/data/
 inflect/scripts/
 project/data/
+
+project/interim_report/naaclhlt2010.sty
+
+project/interim_report/naaclhlt2010.bst
