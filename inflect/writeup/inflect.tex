@@ -1,0 +1,94 @@
+\documentclass[11pt]{article}
+
+\usepackage{graphicx}
+\usepackage{wrapfig}
+\usepackage{url}
+\usepackage{wrapfig}
+\usepackage{color}
+\usepackage{marvosym}
+\usepackage{enumerate}
+\usepackage{subfigure}
+\usepackage{tikz}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{hyperref}
+\usepackage{CJKutf8}
+\usepackage{listings}
+\usepackage[encapsulated]{CJK}
+% set the default code style
+\lstset{
+    frame=tb, % draw a frame at the top and bottom of the code block
+    tabsize=2
+}
+
+\oddsidemargin 0mm
+\evensidemargin 5mm
+\topmargin -20mm
+\textheight 240mm
+\textwidth 160mm
+
+\pagestyle{myheadings}
+\markboth{Haitang Hu}{Machine Translation : Homework 5}
+
+
+\title{Machine Translation\\Inflection}
+\author{Haitang Hu \\
+  {\tt hthu@cs.jhu.edu}}
+\date{\today}
+
+\begin{document}
+\large
+\maketitle
+\thispagestyle{headings}
+\section{Methods} % (fold)
+\label{sec:methods}
+\subsection{Bigram Language Model} % (fold)
+\label{sub:bigram_}
+Here we simply explore the bigram language model over lemma-form pair. Note that we should also consider the back-off scheme, that if we did't match the bigram directly, we should reduce and back-off to unigram model, for our first word in the bigram matching.\\
+The back-off bigram matching shows a significant improvement over unigram model.
+% subsection bigram_ (end)
+
+\subsection{Bigram with Part-of-Speech} % (fold)
+\label{sub:bigram_with_part_of_speech}
+In this model, we also incorporate the Part-of-Speech information onto the bigram model. We now decide a lemma by first looking into its bigram tags and form pairs, so that we are now conditioning POS tags additionally. Again, we also use a back-off scheme here, we first try to match the bigram with tags, then unigram with tags, and finally solely unigram.\\
+This improves bigram language model.
+% subsection bigram_with_part_of_speech (end)
+
+\subsection{Bigram with Dependency Tree} % (fold)
+\label{sub:bigram_with_dependency_tree}
+Similarly, a dependency tree can be parsed to use as a bigram. Here, we consider the node and its parent in the dependency to be a bigram pair, thus allow us to encode longer bigram dependency instead of word level bigram. For better unigram prediction, we also add Part-of-Speech tag on unigrams. A similar back-off scheme has also been used here : we first match dependency bigram, then unigram with tag, and finally unigram.\\
+This improves a little on bigram with Part-of-Speech.
+% subsection bigram_with_dependency_tree (end)
+% section methods (end)
+
+\section{Experiment} % (fold)
+\label{sec:experiment}
+Here, we explore the performance of all three above methods, with different $N$-gram models.
+\begin{table}[!htf]
+\centering
+\begin{tabular}{ | c | c |}
+\hline
+Method & Score\\
+\hline
+bigram & $45817 / 70974 = 0.65$\\
+\hline
+trigram & $46194 / 70974 = 0.65$ \\
+\hline
+$4$-gram & $46216 / 70974 = 0.65$ \\
+\hline
+bigram + POS & $48325 / 70974 = 0.68$ \\
+\hline
+trigram + POS & $48325 / 70974 = 0.68$ \\
+\hline
+bigram + POS + DEP & $\bf{48425 / 70974 = 0.68}$ \\
+\hline
+\end{tabular}
+\caption{Result}
+\end{table}
+% section experiment (end)
+
+\section{Conclusion} % (fold)
+\label{sec:conclusion}
+As we could see here, incorporating more information in our $n$-gram model helps us on evaluating the inflection. Also, since we have developed several methods, we could also consider to add a voting to use the most possible result that are common in major methods. But due to the time limits, we can't implement and test on the \textit{Ensemble} method.
+% section conclusion (end)
+\end{document}
