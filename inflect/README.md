@@ -14,5 +14,8 @@ This script is built based on `ngram` model, but encorporate Part-of-Speech info
 
 The default settings is a trigram model, use `-n` to try higher n-gram model.
 
+####bigram_dep
+This parse the dependency information in a bigram model. The back-off scheme reduces to tagged unigram, and unigram at last.
+
 [1]:http://mt-class.org/jhu/hw5.html
 [2]:https://catalog.ldc.upenn.edu/LDC2006T01
