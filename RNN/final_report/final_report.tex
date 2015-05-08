@@ -378,7 +378,8 @@ The functions of each layer are listed below:
 \label{sub:theano}
 We implemented above structure using \textit{Theano} \cite{theano}, a scientific computation package. The source code is available at:\\
 \url{https://github.com/Nero-Hu/mt/tree/master/RNN}.\\
-Note that the parameter initialization is conducted by sampling from normal distribution $\mathcal{N}(0,0.01)$.
+Note that the parameter initialization is conducted by sampling from normal distribution $\mathcal{N}(0,0.01)$.\\
+Also, our vocabulary are selected to be the most common $1499$ words in both source and target language pairs, all other words are treated to be \textit{unknown}, which sit in the first index of vocabulary in both sides.
 % subsection theano (end)
 
 \subsection{Experiment} % (fold)
@@ -392,7 +393,7 @@ We carried out mini-batch training on each phrase pair, and used the negative li
 \end{figure}
 The fixed learning rate could be problematic, in that we observed \textit{unsmoothed} segments in the figure, which indicates that \textit{adadelta} or \textit{adaboost} should be taken into consideration.
 
-Using the new trained phrase table and the default decoder, we obtained the scores of $TODO$.
+Using the new trained phrase table and the default decoder, we obtained the worse score than given phrase table. The most reasonable explanation is that we are training on a too small data set with limited vocabulary($1500$) size, also the rescoring could also need more thoughts, since the simple softmax log-probability add gives quite similar scores, and is dominated by the length of the words.
 %TODO
 % subsection experiment (end)
 
@@ -400,7 +401,7 @@ Using the new trained phrase table and the default decoder, we obtained the scor
 \label{sub:evaluation} 
 Due to the substantial time needed for the training process, we are only able to conduct the experiment on a limited number of phrase pairs. Nevertehless the empirial experiments indicate that this model has large potential for the decoding task. 
 
-Currently we are using a Germen-English phrase table extracted from the Moses, hopefully we could find some better training resources in the future. Besides, incorpating a better neural language model into the current architecture would yield a better performance.
+Currently we are thinking of trying this model on a Germen-English phrase table extracted from the Moses, which gives us larger vocabulary and more training materials. Hopefully we could find some better training resources in the future. Besides, incorpating a better neural language model into the current architecture should also potentially yield a better performance.
 % subsection evaluation (end)
 
 \begin{thebibliography}{} \itemsep 0.3em
