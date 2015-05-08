@@ -31,7 +31,7 @@
 \maketitle
 
 \begin{abstract}
-In this project, a RNN Encoder-Decoder is used to rescore the translation model scores based on existing phrase table. The RNN Encoder-Decoder consists of two recursive networks which can encodes the input sequences based on history and a bilingual word embedding, and decodes corresponding representations into output sequences respectively. The two networks are jointly trained using negative log-likelihood as the objective function, with sentence level mini-batch SGD. Due to the substantial amount of time required to train the model, we only conduct experiments on small data set.
+In this project, a RNN Encoder-Decoder is used to rescore the translation model scores based on existing phrase table. The RNN Encoder-Decoder consists of two recursive networks which can encodes the input sequences based on history and a bilingual word embedding, and decodes corresponding representations into output sequences respectively. The two networks are jointly trained using negative log-likelihood as the objective function, with sentence level mini-batch SGD. Due to the substantial amount of time required to train the model, we only conducted experiments on small data set.
 \end{abstract}
 
 \section{Introduction}
@@ -377,7 +377,7 @@ The functions of each layer are listed below:
 \subsection{Implementation} % (fold)
 \label{sub:theano}
 We implemented above structure using \textit{Theano} \cite{theano}, a scientific computation package. The source code is available at:\\
-\url{https://github.com/Nero-Hu/RNN}.\\
+\url{https://github.com/Nero-Hu/mt/tree/master/RNN}.\\
 Note that the parameter initialization is conducted by sampling from normal distribution $\mathcal{N}(0,0.01)$.
 % subsection theano (end)
 

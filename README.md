@@ -8,6 +8,8 @@ The repository contains following:
 - [Standard Porter Stemmer][4]
 - [Rerank][5]
 - [Inflection][6]
+- [RNN Phrase encoder/decoder][7]
+
 
 [1]:https://github.com/Nero-Hu/mt/tree/master/alignment/fast_align
 [2]:https://github.com/Nero-Hu/mt/tree/master/decoder
@@ -15,3 +17,4 @@ The repository contains following:
 [4]:https://github.com/Nero-Hu/mt/tree/master/stemmer
 [5]:https://github.com/Nero-Hu/mt/tree/master/reranker
 [6]:https://github.com/Nero-Hu/mt/tree/master/inflect
+[7]:https://github.com/Nero-Hu/mt/blob/master/RNN/

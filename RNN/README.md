@@ -1,2 +1,0 @@
-# RNN
-Recurrent Neural Network
