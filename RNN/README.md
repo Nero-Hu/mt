@@ -10,9 +10,9 @@ You need following to run this scripts.
 - scipy
 - theano
 
-Note that this scripts takes a long time to train, even on GPUs.
+Note that this scripts takes a long time to train, even on GPUs. Test has been done on a **GTX 690** GPU, and it takes around **14** hours to train, and **12** hours to rescore.
 
-Test has been done on a **GTX 690** GPU, and the output looks like following:
+The output looks like following:
 
 	Epochs 1, totalNLL: 489089.337824, used time: 870.954233
 	Epochs 2, totalNLL: 388776.033000, used time: 867.024827
