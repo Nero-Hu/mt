@@ -1,6 +1,8 @@
 ### RNN Phrase Encoder/Decoder
 
-This repository	contains a RNN based phrase encoder/decoder. The original paper is here [Learning phrase representations using rnn encoder-decoder for statistical machine translation][1].
+This repository	contains a RNN based phrase encoder/decoder.
+
+The original paper is here [Learning phrase representations using rnn encoder-decoder for statistical machine translation][1].
 
 ### Usage
 
